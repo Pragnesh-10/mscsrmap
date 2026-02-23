@@ -883,120 +883,46 @@ section {
 }
 
 /* ===== DIRECTORATE ===== */
-.directorate-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 0;
-  text-align: center;
-  justify-content: center;
-}
-
-.directorate-card {
-  background: none;
-  border: none;
-  border-radius: 0;
-  padding: 2.5rem 1.5rem;
-  text-align: center;
-  position: relative;
+/* commented by fawaz for future references */
+.directorate-placeholder {
   display: flex;
-  flex-direction: column;
+  justify-content: center;
   align-items: center;
+  padding: 4rem 0;
+  text-align: center;
 }
 
-.directorate-card::after {
+.tbd-text {
+  font-size: 1.5rem;
+  font-weight: 300;
+  color: var(--text-secondary);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  position: relative;
+  padding-bottom: 0.5rem;
+}
+
+.tbd-text::after {
   content: '';
   position: absolute;
-  right: 0;
-  top: 20%;
-  height: 60%;
-  width: 1px;
-  background: linear-gradient(to bottom, transparent, var(--border), transparent);
-}
-
-.directorate-card:last-child::after,
-.directorate-card:nth-child(3n)::after {
-  /* Remove separator for last item or every 3rd item (for 3-col grid) */
-  display: none;
-}
-
-.directorate-card:hover {
-  transform: translateY(-5px);
-}
-
-.directorate-image {
-  margin-bottom: 1.25rem;
-  width: 100%;
-  display: flex;
-  justify-content: center;
-}
-
-.directorate-image .image-placeholder {
-  width: 120px;
-  height: 120px;
-  border-radius: 50%;
-  overflow: hidden;
-  position: relative;
-  border: 1px solid var(--border);
-}
-
-.directorate-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.directorate-info h3 {
-  font-size: 1.1rem;
-  font-weight: 600;
-  margin-bottom: .2rem;
-  color: var(--text-primary);
-}
-
-.directorate-role {
-  color: var(--text-muted);
-  font-weight: 500;
-  font-size: .85rem;
-  margin-bottom: 0.5rem;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-
-.directorate-social {
-  display: flex;
-  justify-content: center;
-  gap: 1rem;
-  margin-top: 0.5rem;
-}
-
-.directorate-social a {
-  color: var(--text-muted);
-  font-size: 1rem;
-  transition: color 0.2s;
-}
-
-.directorate-social a:hover {
-  color: var(--text-primary);
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40px;
+  height: 1px;
+  background: var(--accent);
+  opacity: 0.5;
 }
 
 /* Mobile Responsiveness for Directorate */
 @media (max-width: 768px) {
-  .directorate-grid {
-    grid-template-columns: 1fr;
+  .directorate-placeholder {
+    padding: 3rem 0;
   }
-
-  .directorate-card::after {
-    width: 60%;
-    height: 1px;
-    top: auto;
-    bottom: 0;
-    right: auto;
-    left: 20%;
-    background: linear-gradient(to right, transparent, var(--border), transparent);
-  }
-
-  .directorate-card:last-child::after {
-    display: none;
+  
+  .tbd-text {
+    font-size: 1.25rem;
+    letter-spacing: 3px;
   }
 }
 
