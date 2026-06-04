@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -46,6 +46,7 @@
                 <li><a href="index.html#home" class="nav-link">Home</a></li>
                 <li><a href="events.html" class="nav-link">Events</a></li>
                 <li><a href="team.html" class="nav-link active">Team</a></li>
+                <li><a href="login.html" class="nav-link" style="color: #0078d4; font-weight: 600;">Login <i class="fas fa-sign-in-alt"></i></a></li>
 
             </ul>
             <div class="hamburger">
@@ -55,26 +56,6 @@
             </div>
         </div>
     </nav>
-
-    <!-- Chief Board Members Section -->
-    <section id="chief-board" class="board">
-        <div class="container">
-            <h2 class="section-title">Chief Board Members</h2>
-            <div class="chief-board-grid">
-                <!-- Add chief board members here -->
-            </div>
-        </div>
-    </section>
-
-    <!-- Board Members Section -->
-    <section id="board" class="board">
-        <div class="container">
-            <h2 class="section-title">Board Members</h2>
-            <div class="board-grid">
-                <!-- Add board members here -->
-            </div>
-        </div>
-    </section>
 
     <!-- Team Members Section -->
     <section id="team" class="team">
@@ -116,6 +97,11 @@
             </div>
         </div>
     </footer>
+
+    <!-- Supabase integration for dynamic data -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/supabase-config.js"></script>
+    <script src="js/public-data.js"></script>
 
     <script src="script.js" defer></script>
 </body>

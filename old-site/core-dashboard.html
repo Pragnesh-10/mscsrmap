@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Core Dashboard - MSC</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="styles.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  
+  <!-- Supabase & Guard -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-config.js"></script>
+  <script src="js/guard.js"></script>
+
+  <!-- QR Code Scanner -->
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  
+  <style>
+    body {
+      background-color: #0a0a0a;
+      color: #ffffff;
+      font-family: 'Inter', sans-serif;
+      margin: 0;
+      padding: 20px;
+    }
+    .dashboard-container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: rgba(25, 25, 25, 0.9);
+      padding: 30px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    }
+    .dashboard-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #333;
+      padding-bottom: 15px;
+      margin-bottom: 20px;
+    }
+    .dashboard-header h2 { margin: 0; }
+    
+    .scanner-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    #reader {
+      width: 100%;
+      max-width: 500px;
+      background: #000;
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+    .scan-status {
+      font-size: 18px;
+      font-weight: 600;
+      text-align: center;
+      padding: 15px;
+      border-radius: 8px;
+      width: 100%;
+      max-width: 500px;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .scan-status.show {
+      opacity: 1;
+    }
+    .success { background: rgba(85, 255, 85, 0.2); color: #55ff55; border: 1px solid #55ff55; }
+    .error { background: rgba(255, 85, 85, 0.2); color: #ff5555; border: 1px solid #ff5555; }
+    
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      background: #0078d4;
+      color: white;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body style="display: none;" id="dashboardBody">
+  
+  <div class="dashboard-container">
+    <div class="dashboard-header">
+      <h2>MSC Core Member Dashboard</h2>
+      <button class="btn" id="btnLogout" style="background: #333;">Logout</button>
+    </div>
+    
+    <div class="scanner-container">
+      <h3>Event Check-in Scanner</h3>
+      <p style="color: #aaaaaa; margin-bottom: 20px;">Scan attendee QR tickets to securely verify and check them into the event.</p>
+      
+      <div id="reader"></div>
+      
+      <div id="scanStatus" class="scan-status"></div>
+    </div>
+  </div>
+
+  <script src="js/dashboard.js"></script>
+</body>
+</html>

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Authentication Portal - MSC</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="styles.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" crossorigin="anonymous" />
+  
+  <!-- Supabase CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+  <style>
+    /* Specific styles for login page keeping the dark aesthetic */
+      body {
+        font-family: 'Inter', sans-serif;
+        background: linear-gradient(135deg, #050505 0%, #111 100%);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        margin: 0;
+      }
+      .auth-container {
+        background: rgba(25, 25, 25, 0.6);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 16px;
+        padding: 50px 40px;
+        width: 100%;
+        max-width: 420px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+        text-align: center;
+      }
+      .auth-container h2 {
+        font-size: 2rem;
+        margin-bottom: 5px;
+        font-weight: 700;
+        background: linear-gradient(90deg, #0078d4, #00bcf2);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      .auth-container p.subtitle {
+        color: #aaa;
+        font-size: 0.95rem;
+        margin-bottom: 30px;
+      }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 14px;
+      color: #aaaaaa;
+      text-align: left;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 12px;
+      background: rgba(0, 0, 0, 0.5);
+      border: 1px solid #333;
+      border-radius: 6px;
+      color: #fff;
+      font-size: 16px;
+      box-sizing: border-box;
+      transition: border-color 0.3s;
+    }
+    .form-group input:focus {
+      outline: none;
+      border-color: #0078d4;
+    }
+    .auth-buttons {
+      display: flex;
+      gap: 12px;
+      margin-top: 24px;
+    }
+    .btn {
+        width: 100%;
+        padding: 14px;
+        border: none;
+        border-radius: 8px;
+        font-size: 1.1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.3s, transform 0.1s;
+      }
+      .btn-primary {
+        background: #0078d4;
+        color: white;
+      }
+      .btn-primary:hover {
+        background: #005a9e;
+      }
+      .btn-primary:active {
+        transform: scale(0.98);
+      }
+    .auth-message {
+      margin-top: 16px;
+      text-align: center;
+      font-size: 14px;
+      color: #ff5555;
+      min-height: 20px;
+    }
+  </style>
+</head>
+<body>
+  
+  <div class="auth-container">
+    <i class="fab fa-microsoft" style="font-size: 3rem; color: #0078d4; margin-bottom: 15px;"></i>
+    <h2>MSC Portal</h2>
+    <p class="subtitle">Sign in to access your community dashboard</p>
+
+    <form id="authForm" onsubmit="event.preventDefault();">
+      <div class="form-group">
+        <label for="email">Email Address</label>
+        <input type="email" id="email" required placeholder="student@srmap.edu.in" />
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" required placeholder="••••••••" />
+      </div>
+      
+      <div class="auth-message" id="authMessage"></div>
+      
+      <div class="auth-buttons">
+        <button type="submit" class="btn btn-primary" id="btnSignIn">Sign In</button>
+      </div>
+    </form>
+  </div>
+
+  <script src="js/supabase-config.js"></script>
+  <script src="js/auth.js"></script>
+</body>
+</html>

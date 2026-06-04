@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -19,6 +19,10 @@
     rel="stylesheet" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
     crossorigin="anonymous" referrerpolicy="no-referrer" />
+  
+  <!-- Supabase & QR Code CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 </head>
 
 <body class="events-page">
@@ -47,6 +51,7 @@
         <li><a href="index.html#home" class="nav-link">Home</a></li>
         <li><a href="events.html" class="nav-link active">Events</a></li>
         <li><a href="team.html" class="nav-link">Team</a></li>
+        <li><a href="login.html" class="nav-link" style="color: #0078d4; font-weight: 600;">Login <i class="fas fa-sign-in-alt"></i></a></li>
 
       </ul>
       <div class="hamburger">
@@ -62,7 +67,40 @@
     <div class="container">
       <h2 class="section-title">Events</h2>
 
-      <!-- Past Events -->
+      <!-- Active Events (Dynamic) -->
+      <div class="events-section" id="activeEventsSection" style="display:none;">
+        <h3 class="events-subtitle">Active Events</h3>
+        <div class="events-grid" id="activeEventsGrid">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <!-- Hackathon Team Sandbox -->
+      <div class="events-section" id="sandboxSection" style="display:none;">
+        <h3 class="events-subtitle">Hackathon Team Sandbox</h3>
+        <div class="sandbox-container" style="background: rgba(25, 25, 25, 0.9); padding: 20px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.1);">
+          <div class="sandbox-header" style="margin-bottom: 20px;">
+            <p>Find teammates or recruit solo participants for upcoming hackathons.</p>
+            <div id="sandboxAuthPrompt" style="color: #ff5555;">Please log in to use the matchmaking sandbox.</div>
+            <div id="sandboxContent" style="display:none; margin-top: 15px;">
+              <button id="btnCreateTeam" class="btn" style="background: #0078d4; color: white; padding: 10px 15px; border: none; border-radius: 6px; cursor: pointer; margin-right: 10px;">Create a Team</button>
+              <button id="btnRegisterSolo" class="btn" style="background: #333; color: white; padding: 10px 15px; border: none; border-radius: 6px; cursor: pointer;">Register as Solo</button>
+            </div>
+          </div>
+          
+          <div id="teamsList" style="display:none;">
+            <h4>Available Teams looking for members</h4>
+            <div id="teamsGrid" class="events-grid" style="margin-top: 15px;"></div>
+          </div>
+
+          <div id="soloList" style="display:none; margin-top: 20px;">
+            <h4>Solo Participants looking for a team</h4>
+            <div id="soloGrid" class="events-grid" style="margin-top: 15px;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Past Events (Static) -->
       <div class="events-section">
         <h3 class="events-subtitle">Past Events</h3>
         <div class="events-grid">
@@ -216,6 +254,10 @@
     </div>
   </footer>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-config.js"></script>
+  <script src="js/events.js"></script>
+  <script src="js/public-data.js"></script>
   <script src="script.js" defer></script>
 </body>
 
