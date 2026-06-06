@@ -190,6 +190,11 @@ export default function AdminPage() {
     const certificateHtml = formData.get('certificate_html') as string
     const registration_open = formData.get('registration_open') === 'on'
 
+    // Generate slug
+    const baseSlug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '')
+    const randomSuffix = Math.random().toString(36).substring(2, 6)
+    const slug = `${baseSlug}-${randomSuffix}`
+
     const form_requirements: Record<string, any> = {
       req_reg_num: formData.get('req_reg_num') === 'on',
       req_branch: formData.get('req_branch') === 'on',
@@ -213,8 +218,11 @@ export default function AdminPage() {
       }
     }
 
+    const maxCapStr = formData.get('max_capacity') as string
+    const max_capacity = maxCapStr ? parseInt(maxCapStr) : null
+
     const { error } = await supabase.from('events').insert([{ 
-      title, date_start, status, location, description, image_url, registration_open, form_requirements 
+      title, slug, date_start, status, location, description: formData.get('description'), image_url, registration_open, form_requirements, certificate_html: certificateHtml, max_capacity 
     }])
     
     if (error) {
@@ -425,8 +433,14 @@ export default function AdminPage() {
                   </div>
 
                   <div className="flex flex-col gap-2">
-                    <label className="text-[13px] font-semibold text-[#a1a1aa] uppercase tracking-wider">Description</label>
-                    <input type="text" name="description" placeholder="Describe the event goals..." className="p-3 bg-black/40 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500" />
+                    <label className="text-[13px] font-semibold text-[#a1a1aa] uppercase tracking-wider">Event Description</label>
+                    <textarea name="description" rows={3} required placeholder="Describe what the event is about..." className="p-4 bg-black/40 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500"></textarea>
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[13px] font-semibold text-[#a1a1aa] uppercase tracking-wider">Maximum Capacity (Optional)</label>
+                    <input type="number" name="max_capacity" min="1" placeholder="e.g. 100 (Leave empty for unlimited)" className="p-4 bg-black/40 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500" />
+                    <span className="text-[10px] text-white/40">If set, any registrations past this limit will automatically be placed on a Waitlist.</span>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -641,6 +655,60 @@ export default function AdminPage() {
 
           {/* ANALYTICS TAB */}
           {activeTab === 'analytics' && <AnalyticsDashboard />}
+
+          {/* AUDIT LOGS TAB (Admins Only) */}
+          {userRole === 'admin' && activeTab === 'audit' && (
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="flex justify-between items-center mb-8">
+                <div>
+                  <h1 className="text-3xl font-black text-white tracking-wider">SECURITY AUDIT LOGS</h1>
+                  <p className="text-[#a1a1aa] mt-2">Immutable record of all administrative actions taken on the platform.</p>
+                </div>
+                <button onClick={fetchAuditLogsData} className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-[13px] font-semibold text-white transition-colors flex items-center gap-2">
+                  <i className="fas fa-sync-alt"></i> Refresh Logs
+                </button>
+              </div>
+
+              <div className="bg-black/30 border border-white/10 rounded-2xl p-6 shadow-2xl backdrop-blur-md overflow-x-auto">
+                {loadingAudit ? (
+                  <div className="flex justify-center p-12">
+                    <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                ) : auditLogs.length === 0 ? (
+                  <p className="text-white/40 text-center py-8">No audit logs found.</p>
+                ) : (
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-white/10 text-[11px] uppercase tracking-widest text-[#a1a1aa]">
+                        <th className="p-4 font-bold">Timestamp</th>
+                        <th className="p-4 font-bold">Admin Email</th>
+                        <th className="p-4 font-bold">Action</th>
+                        <th className="p-4 font-bold">Metadata Details</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {auditLogs.map((log) => (
+                        <tr key={log.id} className="border-b border-white/5 hover:bg-white/5 transition-colors group">
+                          <td className="p-4 text-xs text-white/60 whitespace-nowrap">{new Date(log.created_at).toLocaleString()}</td>
+                          <td className="p-4 text-sm font-bold text-blue-400">{log.admin_email}</td>
+                          <td className="p-4">
+                            <span className="px-2 py-1 bg-white/10 text-white text-[10px] font-black tracking-widest rounded-md border border-white/10">
+                              {log.action_type}
+                            </span>
+                          </td>
+                          <td className="p-4">
+                            <pre className="text-[10px] text-white/50 font-mono bg-black/50 p-2 rounded-lg overflow-x-auto max-w-sm">
+                              {JSON.stringify(log.details, null, 2)}
+                            </pre>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          )}
 
         </div>
       </main>

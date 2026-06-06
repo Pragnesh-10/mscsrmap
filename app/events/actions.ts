@@ -29,7 +29,7 @@ export async function submitPublicRegistration(eventId: string, formData: any) {
   // 3. Fetch Event Requirements for Backend Domain Validation
   const { data: eventData, error: eventError } = await supabase
     .from('events')
-    .select('form_requirements')
+    .select('form_requirements, max_capacity')
     .eq('id', eventId)
     .single()
 
@@ -49,7 +49,7 @@ export async function submitPublicRegistration(eventId: string, formData: any) {
   // Fetch all existing registrations for this event to check against
   const { data: existingRegs } = await supabase
     .from('registrations')
-    .select('lead_email, team_data')
+    .select('lead_email, team_data, status')
     .eq('event_id', eventId)
 
   if (existingRegs) {
@@ -70,17 +70,33 @@ export async function submitPublicRegistration(eventId: string, formData: any) {
     }
   }
 
-  // 3. Generate secure hash payload using lead_email + eventId + timestamp
+  // 3. Capacity Check
+  let incomingCount = 1 + teamMembers.length
+  let currentConfirmedCount = 0
+  
+  if (eventData.max_capacity) {
+    existingRegs?.forEach(reg => {
+      if (reg.status === 'confirmed') {
+        currentConfirmedCount += 1 + (reg.team_data?.members?.length || 0)
+      }
+    })
+  }
+
+  const assignedStatus = (eventData.max_capacity && (currentConfirmedCount + incomingCount > eventData.max_capacity))
+    ? 'waitlisted'
+    : 'confirmed'
+
+  // 4. Generate secure hash payload using lead_email + eventId + timestamp
   const message = `${leadEmail}${eventId}${new Date().toISOString()}`
   const hashPayload = crypto.createHash('sha256').update(message).digest('hex')
 
-  // 4. Remove team-specific arrays from the base form data
+  // 5. Remove team-specific arrays from the base form data
   const baseFormData = { ...formData }
   delete baseFormData.teamMembers
   delete baseFormData.teamLeadIndex
   delete baseFormData.teamName
 
-  // 5. Insert into Supabase registrations table
+  // 6. Insert into Supabase registrations table
   const { data: insertedData, error } = await supabase
     .from('registrations')
     .insert([{
@@ -88,7 +104,8 @@ export async function submitPublicRegistration(eventId: string, formData: any) {
       lead_email: leadEmail,
       form_data: baseFormData,
       team_data: teamMembers.length > 0 ? { members: teamMembers, leadIndex: teamLeadIndex, teamName: formData.teamName } : null,
-      hash_payload: hashPayload
+      hash_payload: hashPayload,
+      status: assignedStatus
     }])
     .select('*')
     .single()
@@ -102,10 +119,35 @@ export async function submitPublicRegistration(eventId: string, formData: any) {
     return { error: error.message }
   }
 
-  // 6. Revalidate cache so the UI updates
+  // 7. Matchmaking Hook: If they want more members, create a team row
+  if (formData.lookingForMembers && formData.teamName) {
+    const leaderFullName = baseFormData.fullName || ''
+    const leaderEmail = leadEmail
+    const leaderBranch = baseFormData.branch || ''
+    const leaderYear = baseFormData.year || ''
+
+    await supabase.from('teams').insert([{
+      registration_id: insertedData.id,
+      event_id: eventId,
+      team_name: formData.teamName,
+      max_team_size: eventData.form_requirements?.max_team_size || 4,
+      looking_for_members: true,
+      leader_name: leaderFullName,
+      leader_email: leaderEmail,
+      leader_branch: leaderBranch,
+      leader_year: leaderYear
+    }])
+  }
+
+  // 8. Revalidate cache so the UI updates
   revalidatePath('/events')
 
-  return { success: true, hash_payload: hashPayload, registration: insertedData }
+  return { 
+    success: true, 
+    hash_payload: hashPayload, 
+    registration: insertedData,
+    isWaitlisted: assignedStatus === 'waitlisted'
+  }
 }
 
 export async function lookupTeamRegistration(eventId: string, email: string) {
@@ -142,4 +184,63 @@ export async function lookupTeamRegistration(eventId: string, email: string) {
   }
 
   return { error: "No registration found for that email address. Make sure you entered the correct email used during registration." }
+}
+
+export async function joinMatchmakingTeam(teamId: string, memberData: any) {
+  const supabase = await createClient()
+
+  // 1. Fetch the matchmaking team to get the registration link
+  const { data: team, error: teamError } = await supabase
+    .from('teams')
+    .select('registration_id, max_team_size, looking_for_members')
+    .eq('id', teamId)
+    .single()
+
+  if (teamError || !team || !team.looking_for_members) {
+    return { error: 'Team not found or is no longer accepting members.' }
+  }
+
+  // 2. Fetch the actual registration data
+  const { data: reg, error: regError } = await supabase
+    .from('registrations')
+    .select('id, team_data, hash_payload')
+    .eq('id', team.registration_id)
+    .single()
+
+  if (regError || !reg) {
+    return { error: 'Registration not found for this team.' }
+  }
+
+  // 3. Prevent duplicate emails within the team
+  const existingMembers = reg.team_data?.members || []
+  for (const member of existingMembers) {
+    if (member.email?.toLowerCase().trim() === memberData.email?.toLowerCase().trim()) {
+      return { error: 'You are already registered on this team!' }
+    }
+  }
+
+  // 4. Append the new member
+  const newMembers = [...existingMembers, memberData]
+  const newTeamData = {
+    ...reg.team_data,
+    members: newMembers
+  }
+
+  // 5. Update Registration
+  const { error: updateError } = await supabase
+    .from('registrations')
+    .update({ team_data: newTeamData })
+    .eq('id', reg.id)
+
+  if (updateError) return { error: 'Failed to join team.' }
+
+  // 6. If the team is now full, close the matchmaking slot
+  if (newMembers.length + 1 >= team.max_team_size) {
+    await supabase.from('teams').update({ looking_for_members: false }).eq('id', teamId)
+  }
+
+  revalidatePath('/events')
+  
+  // Return the team's hash payload so the new member can view their ticket instantly
+  return { success: true, hash_payload: reg.hash_payload }
 }

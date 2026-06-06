@@ -2,6 +2,7 @@
 
 import { useState, Fragment } from 'react'
 import { assignCertificates, updateRegistrationDetails } from './actions'
+import IDCardModal from './IDCardModal'
 
 export default function RegistrationsTable({ registrations, eventTitle, eventId }: { registrations: any[], eventTitle: string, eventId: string }) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -13,6 +14,7 @@ export default function RegistrationsTable({ registrations, eventTitle, eventId 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState<any>(null)
   const [isSaving, setIsSaving] = useState(false)
+  const [isIDModalOpen, setIsIDModalOpen] = useState(false)
 
   const toggleExpand = (id: string) => {
     setExpandedId(expandedId === id ? null : id)
@@ -98,7 +100,8 @@ export default function RegistrationsTable({ registrations, eventTitle, eventId 
   })
 
   return (
-    <div className="bg-[#18181b]/60 backdrop-blur-xl border border-white/10 rounded-[20px] overflow-hidden shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <>
+      <div className="bg-[#18181b]/60 backdrop-blur-xl border border-white/10 rounded-[20px] overflow-hidden shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="p-6 border-b border-white/10 flex flex-col md:flex-row justify-between items-center gap-4 bg-black/20">
         <div className="relative w-full md:w-96">
           <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-white/40"></i>
@@ -141,6 +144,13 @@ export default function RegistrationsTable({ registrations, eventTitle, eventId 
             className="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 rounded-xl font-bold transition-all shadow-lg text-white disabled:opacity-50"
           >
             {isAssigning ? 'Assigning...' : 'Assign Certificates'}
+          </button>
+          <button 
+            disabled={selectedIds.size === 0}
+            onClick={() => setIsIDModalOpen(true)}
+            className="px-6 py-3 bg-purple-600/20 text-purple-400 hover:bg-purple-600/40 border border-purple-500/30 rounded-xl font-bold transition-all shadow-lg disabled:opacity-50 flex items-center gap-2"
+          >
+            <i className="fas fa-id-badge"></i> Generate ID Cards
           </button>
         </div>
       )}
@@ -323,5 +333,13 @@ export default function RegistrationsTable({ registrations, eventTitle, eventId 
         </table>
       </div>
     </div>
-  )
+      
+    <IDCardModal 
+      isOpen={isIDModalOpen} 
+      onClose={() => setIsIDModalOpen(false)} 
+      registrations={filteredRegs.filter(r => selectedIds.has(r.id))} 
+      eventTitle={eventTitle}
+    />
+  </>
+)
 }

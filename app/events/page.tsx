@@ -63,7 +63,7 @@ export default async function EventsPage() {
                     </div>
                     <div className="mt-4">
                       <Link 
-                        href={`/events/${evt.id}`}
+                        href={`/events/${evt.slug || evt.id}`}
                         className="mt-4 px-5 py-2.5 rounded-xl text-sm font-bold transition-all w-full flex justify-center items-center gap-2 bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.1)]"
                       >
                         <span>Open Event Portal</span><i className="fas fa-arrow-right"></i>

@@ -6,18 +6,50 @@ import { notFound } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
 
-export default async function EventPortalPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function EventPage({ params }: { params: Promise<{ slug: string }> }) {
   const supabase = await createClient()
-  const { id } = await params
+  const { slug } = await params
 
+  // Fetch event details by slug
   const { data: evt, error } = await supabase
     .from('events')
     .select('*')
-    .eq('id', id)
+    .eq('slug', slug)
     .single()
 
   if (error || !evt) {
     return notFound()
+  }
+
+  // Calculate waitlist mode
+  let isWaitlistMode = false
+  if (evt.max_capacity) {
+    const { data: existingRegs } = await supabase
+      .from('registrations')
+      .select('team_data, status')
+      .eq('event_id', evt.id)
+      .eq('status', 'confirmed')
+
+    let currentConfirmedCount = 0
+    existingRegs?.forEach(reg => {
+      currentConfirmedCount += 1 + (reg.team_data?.members?.length || 0)
+    })
+    
+    if (currentConfirmedCount >= evt.max_capacity) {
+      isWaitlistMode = true
+    }
+  }
+
+  // Fetch Matchmaking Teams
+  let openTeams: any[] = []
+  if (evt.form_requirements?.allow_teams) {
+    const { data: teamsData } = await supabase
+      .from('teams')
+      .select('*')
+      .eq('event_id', evt.id)
+      .eq('looking_for_members', true)
+      
+    if (teamsData) openTeams = teamsData
   }
 
   return (
@@ -68,7 +100,7 @@ export default async function EventPortalPage({ params }: { params: Promise<{ id
             </div>
           </div>
 
-          <EventPortalTabs event={evt} />
+          <EventPortalTabs event={evt} isWaitlistMode={isWaitlistMode} openTeams={openTeams} />
         </div>
       </main>
     </>

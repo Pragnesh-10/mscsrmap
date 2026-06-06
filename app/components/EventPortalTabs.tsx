@@ -5,10 +5,10 @@ import { createPortal } from 'react-dom'
 import { QRCodeSVG } from 'qrcode.react'
 // @ts-ignore
 import domtoimage from 'dom-to-image-more'
-import { submitPublicRegistration, lookupTeamRegistration } from '../events/actions'
+import { submitPublicRegistration, lookupTeamRegistration, joinMatchmakingTeam } from '../events/actions'
 
-export default function EventPortalTabs({ event }: { event: any }) {
-  const [activeTab, setActiveTab] = useState<'register' | 'check' | 'certificate'>('register')
+export default function EventPortalTabs({ event, isWaitlistMode = false, openTeams = [] }: { event: any, isWaitlistMode?: boolean, openTeams?: any[] }) {
+  const [activeTab, setActiveTab] = useState<'register' | 'matchmaking' | 'check' | 'certificate'>('register')
   const [mounted, setMounted] = useState(false)
 
   // Registration State
@@ -17,11 +17,16 @@ export default function EventPortalTabs({ event }: { event: any }) {
   const [currentHash, setCurrentHash] = useState<string | null>(null)
   const [currentReg, setCurrentReg] = useState<any>(null)
   const [showTicketModal, setShowTicketModal] = useState(false)
+  const [showWaitlistModal, setShowWaitlistModal] = useState(false)
   
   // Lookup State
   const [lookupEmail, setLookupEmail] = useState('')
   const [lookupLoading, setLookupLoading] = useState(false)
   const [lookupError, setLookupError] = useState<string | null>(null)
+  
+  // Matchmaking State
+  const [selectedJoinTeam, setSelectedJoinTeam] = useState<any>(null)
+  const [joinLoading, setJoinLoading] = useState(false)
   
   // Dynamic Form State
   const [teamSize, setTeamSize] = useState(1)
@@ -100,11 +105,15 @@ export default function EventPortalTabs({ event }: { event: any }) {
     if (res?.error) {
       setErrorMsg(res.error)
     } else if (res?.success) {
-      setCurrentHash(res.hash_payload)
-      if (res.registration) {
-        setCurrentReg(res.registration)
+      if (res.isWaitlisted) {
+        setShowWaitlistModal(true)
+      } else {
+        setCurrentHash(res.hash_payload)
+        if (res.registration) {
+          setCurrentReg(res.registration)
+        }
+        setShowTicketModal(true)
       }
-      setShowTicketModal(true)
     }
   }
 
@@ -121,6 +130,32 @@ export default function EventPortalTabs({ event }: { event: any }) {
     } else if (res?.success) {
       setCurrentHash(res.hash_payload)
       if (res.registration) setCurrentReg(res.registration)
+      setShowTicketModal(true)
+    }
+  }
+
+  async function handleJoinSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    setJoinLoading(true)
+    setErrorMsg(null)
+
+    const formData = new FormData(e.currentTarget)
+    const memberData = {
+      fullName: formData.get('joinName'),
+      email: formData.get('joinEmail'),
+      year: formData.get('joinYear'),
+      branch: formData.get('joinBranch'),
+      regNum: formData.get('joinRegNum')
+    }
+
+    const res = await joinMatchmakingTeam(selectedJoinTeam.id, memberData)
+    setJoinLoading(false)
+
+    if (res?.error) {
+      setErrorMsg(res.error)
+    } else if (res?.success) {
+      setCurrentHash(res.hash_payload)
+      setSelectedJoinTeam(null)
       setShowTicketModal(true)
     }
   }
@@ -167,14 +202,22 @@ export default function EventPortalTabs({ event }: { event: any }) {
         <div className="flex flex-col md:flex-row gap-2 mb-8 bg-[#18181b]/40 backdrop-blur-md p-2 rounded-2xl border border-white/5">
           <button 
             onClick={() => setActiveTab('register')}
-            className={`flex-1 py-4 px-6 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${
-              activeTab === 'register' 
-                ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.1)]' 
-                : 'text-white/40 hover:text-white hover:bg-white/5'
-            }`}
+            className={`flex-1 py-4 text-center font-bold text-sm transition-all flex flex-col items-center justify-center gap-1 ${activeTab === 'register' ? (isWaitlistMode ? 'text-yellow-400 bg-yellow-400/5 shadow-[inset_0_-2px_0_rgba(234,179,8,1)]' : 'text-blue-400 bg-blue-500/5 shadow-[inset_0_-2px_0_rgba(59,130,246,1)]') : 'text-white/40 hover:text-white/80 hover:bg-white/5'}`}
           >
-            <i className="fas fa-file-signature"></i> Register for Event
+            <i className={`fas ${isWaitlistMode ? 'fa-clock' : 'fa-user-plus'} text-lg mb-1`}></i>
+            {isWaitlistMode ? 'Join Waitlist' : 'Register Now'}
           </button>
+
+          {reqs.allow_teams && (
+            <button 
+              onClick={() => setActiveTab('matchmaking')}
+              className={`flex-1 py-4 text-center font-bold text-sm transition-all flex flex-col items-center justify-center gap-1 ${activeTab === 'matchmaking' ? 'text-cyan-400 bg-cyan-500/5 shadow-[inset_0_-2px_0_rgba(34,211,238,1)]' : 'text-white/40 hover:text-white/80 hover:bg-white/5'}`}
+            >
+              <i className="fas fa-users-viewfinder text-lg mb-1"></i>
+              Find a Team
+            </button>
+          )}
+
           <button 
             onClick={() => setActiveTab('check')}
             className={`flex-1 py-4 px-6 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${
@@ -207,7 +250,7 @@ export default function EventPortalTabs({ event }: { event: any }) {
           {activeTab === 'register' && (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
               <div className="mb-8 border-b border-white/5 pb-6">
-                <h2 className="text-2xl font-bold text-white mb-2">Event Registration</h2>
+                <h2 className="text-2xl font-bold text-white mb-2">{isWaitlistMode ? 'Join Event Waitlist' : 'Event Registration'}</h2>
                 <p className="text-white/40 text-sm">Secure your spot by filling out the form below.</p>
               </div>
 
@@ -376,15 +419,79 @@ export default function EventPortalTabs({ event }: { event: any }) {
                     </div>
                   )}
 
-                  <button type="submit" disabled={loading} className="w-full mt-4 p-4 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 rounded-xl font-bold transition-all shadow-lg text-white disabled:opacity-50">
-                    {loading ? 'Processing Registration...' : 'Complete Registration'}
+                  {reqs.allow_teams && teamSize > 1 && teamSize < reqs.max_team_size && (
+                    <div className="flex flex-col gap-3 p-5 bg-cyan-500/10 border border-cyan-500/20 rounded-xl mt-4">
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input type="checkbox" name="lookingForMembers" className="w-5 h-5 accent-cyan-500 rounded border-white/20 bg-black/50" />
+                        <div>
+                          <span className="text-sm font-bold text-cyan-400 block">Looking for more team members?</span>
+                          <span className="text-xs text-white/50 block mt-1">If checked, we'll feature your team on the public Matchmaking board so solos can join you!</span>
+                        </div>
+                      </label>
+                    </div>
+                  )}
+
+                  <button type="submit" disabled={loading} className={`w-full mt-4 p-4 rounded-xl font-bold transition-all shadow-lg text-white disabled:opacity-50 ${isWaitlistMode ? 'bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 shadow-[0_0_20px_rgba(234,179,8,0.2)]' : 'bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 shadow-[0_0_20px_rgba(59,130,246,0.2)]'}`}>
+                    {loading ? 'Processing...' : isWaitlistMode ? 'Join Waitlist Queue' : 'Complete Registration'}
                   </button>
                 </form>
               )}
             </div>
           )}
 
-          {/* CHECK TEAM TAB */}
+          {/* MATCHMAKING TAB */}
+          {activeTab === 'matchmaking' && (
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
+              <div className="mb-8 border-b border-white/5 pb-6">
+                <h2 className="text-2xl font-bold text-cyan-400 mb-2">Team Matchmaking</h2>
+                <p className="text-white/40 text-sm">Looking for a team? Browse teams that are actively seeking members and join one instantly!</p>
+              </div>
+
+              {openTeams.length === 0 ? (
+                <div className="text-center p-12 bg-white/5 rounded-2xl border border-white/10">
+                  <div className="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-4 text-white/40">
+                    <i className="fas fa-users-slash text-2xl"></i>
+                  </div>
+                  <h3 className="text-lg font-bold text-white mb-1">No Open Teams</h3>
+                  <p className="text-sm text-white/40">Check back later or register a new team yourself!</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {openTeams.map(team => (
+                    <div key={team.id} className="bg-[#1e1e24] border border-cyan-500/20 rounded-2xl p-6 relative group overflow-hidden hover:border-cyan-500/40 transition-colors">
+                      <div className="absolute top-0 left-0 w-1 h-full bg-cyan-500"></div>
+                      <h3 className="text-xl font-bold text-white mb-1">{team.team_name}</h3>
+                      <p className="text-xs text-cyan-400 font-semibold mb-4 uppercase tracking-wider">Accepting Members</p>
+                      
+                      <div className="bg-black/30 rounded-xl p-4 mb-5 border border-white/5">
+                        <div className="flex items-center gap-3 mb-2">
+                          <div className="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center text-cyan-400">
+                            <i className="fas fa-user-tie text-xs"></i>
+                          </div>
+                          <div>
+                            <p className="text-xs text-white/40">Team Leader</p>
+                            <p className="text-sm font-bold text-white">{team.leader_name}</p>
+                          </div>
+                        </div>
+                        <p className="text-xs text-white/60 pl-11">
+                          {team.leader_year} Year • {team.leader_branch}
+                        </p>
+                      </div>
+
+                      <button 
+                        onClick={() => setSelectedJoinTeam(team)}
+                        className="w-full py-3 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/20 rounded-xl font-bold text-sm transition-all shadow-[0_0_15px_rgba(34,211,238,0.1)] flex items-center justify-center gap-2"
+                      >
+                        <i className="fas fa-right-to-bracket"></i> Request to Join
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* CHECK TAB */}
           {activeTab === 'check' && (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
               <div className="mb-8 border-b border-white/5 pb-6">
@@ -474,8 +581,6 @@ export default function EventPortalTabs({ event }: { event: any }) {
                       textShadow: customTemplateUrl ? '0 2px 10px rgba(0,0,0,0.8)' : 'none'
                     }}
                   >
-                    {/* Optional Dark Overlay if custom template is too bright, but we rely on text-shadow instead to preserve the template's beauty */}
-                    
                     {/* Watermark Logo/Icon - hide if custom template to prevent clashing */}
                     {!customTemplateUrl && (
                       <i className={`fas absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[300px] opacity-5 pointer-events-none ${
@@ -587,13 +692,70 @@ export default function EventPortalTabs({ event }: { event: any }) {
                   </div>
                 </div>
               )}
-              
-
             </div>
 
             <button onClick={downloadTicket} className="w-full py-4 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 rounded-xl text-white font-bold transition-colors shadow-lg flex justify-center items-center gap-2">
               <i className="fas fa-download"></i> Download Ticket Form
             </button>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Waitlist Success Modal */}
+      {mounted && showWaitlistModal && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[#18181b] border border-white/10 rounded-2xl p-8 w-full max-w-sm flex flex-col shadow-2xl relative items-center text-center">
+            <button onClick={() => setShowWaitlistModal(false)} className="absolute top-4 right-4 text-white/40 hover:text-white transition-colors">
+              <i className="fas fa-times text-lg"></i>
+            </button>
+            <div className="w-20 h-20 bg-yellow-500/10 text-yellow-400 rounded-full flex items-center justify-center text-4xl mb-6 shadow-[0_0_30px_rgba(234,179,8,0.2)]">
+              <i className="fas fa-clock"></i>
+            </div>
+            <h3 className="text-2xl font-bold text-white mb-2">You're on the list!</h3>
+            <p className="text-sm text-white/60 mb-8 leading-relaxed">
+              This event is currently at full capacity, but you've been added to the waitlist queue. If a spot opens up, the organizers will notify you and automatically issue your ticket!
+            </p>
+            <button onClick={() => setShowWaitlistModal(false)} className="w-full py-4 bg-white/10 hover:bg-white/20 text-white rounded-xl font-bold transition-colors shadow-lg">
+              Got it
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* JOIN TEAM MODAL */}
+      {mounted && selectedJoinTeam && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[#18181b] border border-white/10 rounded-2xl p-6 w-full max-w-md shadow-2xl relative overflow-hidden">
+            <button onClick={() => { setSelectedJoinTeam(null); setErrorMsg(null); }} className="absolute top-4 right-4 text-white/40 hover:text-white transition-colors z-10">
+              <i className="fas fa-times text-lg"></i>
+            </button>
+            <div className="mb-6 relative z-10">
+              <h3 className="text-xl font-bold text-white mb-1">Join "{selectedJoinTeam.team_name}"</h3>
+              <p className="text-sm text-white/40">Fill out your details below to instantly join this team.</p>
+            </div>
+            <form onSubmit={handleJoinSubmit} className="flex flex-col gap-4 relative z-10">
+              {errorMsg && <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-500 rounded-lg text-xs font-semibold">{errorMsg}</div>}
+              <input required name="joinName" type="text" placeholder="Your Full Name" className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500 transition-colors placeholder:text-white/20" />
+              <input required name="joinEmail" type="email" placeholder="Your Email Address" className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500 transition-colors placeholder:text-white/20" />
+              {reqs.req_reg_num && (
+                <input required name="joinRegNum" type="text" placeholder="Registration Number" className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500 transition-colors placeholder:text-white/20" />
+              )}
+              {reqs.req_branch && (
+                <input required name="joinBranch" type="text" placeholder="Branch / Specialization" className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500 transition-colors placeholder:text-white/20" />
+              )}
+              <select required name="joinYear" className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500 transition-colors">
+                <option value="" disabled selected>Select Year of Study</option>
+                <option value="1">1st Year</option>
+                <option value="2">2nd Year</option>
+                <option value="3">3rd Year</option>
+                <option value="4">4th Year</option>
+              </select>
+              <button type="submit" disabled={joinLoading} className="w-full mt-2 py-4 bg-cyan-500 hover:bg-cyan-600 text-black rounded-xl font-bold transition-colors shadow-[0_0_20px_rgba(34,211,238,0.3)] disabled:opacity-50">
+                {joinLoading ? 'Joining...' : 'Join Team Now'}
+              </button>
+            </form>
           </div>
         </div>,
         document.body

@@ -19,12 +19,14 @@ interface Props {
   eventTitle: string;
   isRegistrationOpen: boolean;
   formRequirements?: FormRequirements;
+  isWaitlistMode?: boolean;
 }
 
-export default function RegisterButton({ eventId, eventTitle, isRegistrationOpen, formRequirements }: Props) {
+export default function RegisterButton({ eventId, eventTitle, isRegistrationOpen, formRequirements, isWaitlistMode = false }: Props) {
   const [loading, setLoading] = useState(false)
   const [showFormModal, setShowFormModal] = useState(false)
   const [showTicketModal, setShowTicketModal] = useState(false)
+  const [showWaitlistModal, setShowWaitlistModal] = useState(false)
   const [currentHash, setCurrentHash] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
@@ -84,9 +86,13 @@ export default function RegisterButton({ eventId, eventTitle, isRegistrationOpen
     if (res?.error) {
       setErrorMsg(res.error)
     } else if (res?.success) {
-      setCurrentHash(res.hash_payload)
       setShowFormModal(false)
-      setShowTicketModal(true)
+      if (res.isWaitlisted) {
+        setShowWaitlistModal(true)
+      } else {
+        setCurrentHash(res.hash_payload)
+        setShowTicketModal(true)
+      }
     }
   }
 
@@ -120,13 +126,17 @@ export default function RegisterButton({ eventId, eventTitle, isRegistrationOpen
             ? 'bg-green-500/10 text-green-400 border border-green-500/20 hover:bg-green-500/20 shadow-[0_0_15px_rgba(34,197,94,0.1)]' 
             : !isRegistrationOpen
               ? 'bg-white/5 text-white/40 border border-white/10 cursor-not-allowed'
-              : 'bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.1)]'
+              : isWaitlistMode
+                ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 hover:bg-yellow-500/20 shadow-[0_0_15px_rgba(234,179,8,0.1)]'
+                : 'bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.1)]'
         } disabled:opacity-50`}
       >
         {currentHash ? (
           <><span>View My Ticket</span><i className="fas fa-qrcode"></i></>
         ) : !isRegistrationOpen ? (
           <><span>Registrations Closed</span><i className="fas fa-lock"></i></>
+        ) : isWaitlistMode ? (
+          <><span>Join Waitlist</span><i className="fas fa-clock"></i></>
         ) : (
           <><span>Register Now</span><i className="fas fa-arrow-right"></i></>
         )}
@@ -254,8 +264,8 @@ export default function RegisterButton({ eventId, eventTitle, isRegistrationOpen
                 </div>
               )}
 
-              <button type="submit" disabled={loading} className="w-full mt-4 p-4 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 rounded-xl font-bold transition-all shadow-lg text-white disabled:opacity-50">
-                {loading ? 'Processing Registration...' : 'Complete Registration'}
+              <button type="submit" disabled={loading} className={`w-full mt-4 p-4 rounded-xl font-bold transition-all shadow-lg text-white disabled:opacity-50 ${isWaitlistMode ? 'bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600' : 'bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600'}`}>
+                {loading ? 'Processing...' : isWaitlistMode ? 'Join Waitlist Queue' : 'Complete Registration'}
               </button>
             </form>
           </div>
@@ -289,6 +299,28 @@ export default function RegisterButton({ eventId, eventTitle, isRegistrationOpen
 
             <button onClick={downloadTicket} className="w-full py-4 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 rounded-xl text-white font-bold transition-colors shadow-lg flex justify-center items-center gap-2">
               <i className="fas fa-download"></i> Download Ticket Form
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Waitlist Success Modal */}
+      {mounted && showWaitlistModal && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[#18181b] border border-white/10 rounded-2xl p-8 w-full max-w-sm flex flex-col shadow-2xl relative items-center text-center">
+            <button onClick={() => setShowWaitlistModal(false)} className="absolute top-4 right-4 text-white/40 hover:text-white transition-colors">
+              <i className="fas fa-times text-lg"></i>
+            </button>
+            <div className="w-20 h-20 bg-yellow-500/10 text-yellow-400 rounded-full flex items-center justify-center text-4xl mb-6 shadow-[0_0_30px_rgba(234,179,8,0.2)]">
+              <i className="fas fa-clock"></i>
+            </div>
+            <h3 className="text-2xl font-bold text-white mb-2">You're on the list!</h3>
+            <p className="text-sm text-white/60 mb-8 leading-relaxed">
+              This event is currently at full capacity, but you've been added to the waitlist queue. If a spot opens up, the organizers will notify you and automatically issue your ticket!
+            </p>
+            <button onClick={() => setShowWaitlistModal(false)} className="w-full py-4 bg-white/10 hover:bg-white/20 text-white rounded-xl font-bold transition-colors shadow-lg">
+              Got it
             </button>
           </div>
         </div>,
