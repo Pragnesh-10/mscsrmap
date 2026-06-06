@@ -41,10 +41,8 @@ export async function submitOnboarding(formData: FormData) {
     .eq('id', session.user.id)
     .single()
 
-  if (profile?.role === 'admin') {
+  if (profile?.role === 'admin' || profile?.role === 'core_member') {
     redirect('/admin')
-  } else if (profile?.role === 'core_member') {
-    redirect('/core-dashboard')
   } else {
     redirect('/dashboard')
   }

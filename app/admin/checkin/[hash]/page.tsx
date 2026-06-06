@@ -1,11 +1,14 @@
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 import Link from 'next/link'
+import { logAudit } from '../../audit_actions'
 
 export const dynamic = 'force-dynamic'
 
-export default async function CheckinPage({ params }: { params: { hash: string } }) {
+export default async function CheckinPage({ params, searchParams }: { params: Promise<{ hash: string }>, searchParams: Promise<{ eventId?: string }> }) {
   const supabase = await createClient()
+  const { hash } = await params
+  const { eventId } = await searchParams
 
   // Verify Admin / Core Team status is handled by proxy.ts, but let's be safe
   const { data: { session } } = await supabase.auth.getSession()
@@ -29,7 +32,7 @@ export default async function CheckinPage({ params }: { params: { hash: string }
       *,
       events ( title, date_start, location )
     `)
-    .eq('hash_payload', params.hash)
+    .eq('hash_payload', hash)
     .single()
 
   if (error || !reg) {
@@ -47,6 +50,22 @@ export default async function CheckinPage({ params }: { params: { hash: string }
     )
   }
 
+  // Cross-reference with the scanner's event ID if provided
+  if (eventId && reg.event_id !== eventId) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#0a0a0b] text-white p-6">
+        <div className="p-8 bg-[#18181b] border border-orange-500/20 rounded-2xl text-center w-full max-w-md shadow-2xl">
+          <div className="w-20 h-20 bg-orange-500/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-orange-500/20">
+            <i className="fas fa-exclamation-triangle text-3xl text-orange-500"></i>
+          </div>
+          <h2 className="text-2xl font-bold mb-2">Wrong Event!</h2>
+          <p className="text-white/60 mb-8">This ticket is valid, but it is for <strong>{reg.events.title}</strong>, not the event you are currently scanning for.</p>
+          <Link href={`/admin/events/${eventId}/scanner`} className="text-blue-400 hover:text-blue-300 text-sm font-semibold">Back to Scanner</Link>
+        </div>
+      </div>
+    )
+  }
+
   const isCheckedIn = reg.checked_in
   const event = reg.events
 
@@ -54,8 +73,9 @@ export default async function CheckinPage({ params }: { params: { hash: string }
   async function markAsAttended() {
     'use server'
     const sb = await createClient()
-    await sb.from('registrations').update({ checked_in: true }).eq('hash_payload', params.hash)
-    revalidatePath(`/admin/checkin/${params.hash}`)
+    await sb.from('registrations').update({ checked_in: true }).eq('hash_payload', hash)
+    revalidatePath(`/admin/checkin/${hash}`)
+    await logAudit('SCAN_TICKET', { hash, event_title: reg.events.title, lead_email: reg.lead_email })
   }
 
   return (
@@ -66,7 +86,7 @@ export default async function CheckinPage({ params }: { params: { hash: string }
       <div className="w-full max-w-3xl">
         <div className="flex justify-between items-center mb-8">
           <Link href="/admin" className="text-white/40 hover:text-white transition-colors flex items-center gap-2 text-sm font-semibold">
-            <i className="fas fa-arrow-left"></i> Admin Dashboard
+            <i className="fas fa-arrow-left"></i> Workspace Dashboard
           </Link>
           <div className="px-3 py-1 bg-white/5 border border-white/10 rounded-full text-xs font-bold text-white/60 tracking-wider">
             CHECK-IN PORTAL
@@ -141,7 +161,10 @@ export default async function CheckinPage({ params }: { params: { hash: string }
         {reg.team_data && reg.team_data.members && reg.team_data.members.length > 0 && (
           <div className="bg-[#18181b]/40 backdrop-blur-md border border-white/5 rounded-2xl p-8">
             <h3 className="text-sm font-bold text-white/40 uppercase tracking-widest mb-6 border-b border-white/5 pb-4 flex items-center justify-between">
-              <span>Team Members ({reg.team_data.members.length})</span>
+              <span>
+                Team Members ({reg.team_data.members.length})
+                {reg.team_data.teamName && <span className="ml-3 text-purple-400 font-extrabold uppercase bg-purple-500/10 px-3 py-1 rounded-full text-xs">Team: {reg.team_data.teamName}</span>}
+              </span>
               {reg.team_data.leadIndex === 0 && <span className="text-blue-400 text-xs px-2 py-1 bg-blue-500/10 rounded-md">Primary is Team Lead</span>}
             </h3>
 

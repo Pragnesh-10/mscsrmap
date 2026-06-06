@@ -67,7 +67,7 @@ export async function proxy(request: NextRequest) {
 
     if (currentPath.startsWith('/onboarding')) {
       if (is_onboarded || exemptFromOnboarding) {
-        return NextResponse.redirect(new URL(role === 'admin' ? '/admin' : role === 'core_member' ? '/core-dashboard' : '/dashboard', request.url));
+        return NextResponse.redirect(new URL(role === 'admin' || role === 'core_member' ? '/admin' : '/dashboard', request.url));
       }
     } else {
       if (!is_onboarded && !exemptFromOnboarding) {
@@ -76,11 +76,7 @@ export async function proxy(request: NextRequest) {
     }
 
     // RBAC logic
-    if (currentPath.startsWith('/admin') && role !== 'admin') {
-      return NextResponse.redirect(new URL('/login?message=Unauthorized', request.url));
-    }
-
-    if (currentPath.startsWith('/core-dashboard') && role !== 'admin' && role !== 'core_member') {
+    if (currentPath.startsWith('/admin') && role !== 'admin' && role !== 'core_member') {
       return NextResponse.redirect(new URL('/login?message=Unauthorized', request.url));
     }
   }

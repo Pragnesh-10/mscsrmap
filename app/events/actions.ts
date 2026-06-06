@@ -26,6 +26,26 @@ export async function submitPublicRegistration(eventId: string, formData: any) {
     return { error: 'Duplicate emails found within your team. Each member must have a unique email address.' }
   }
 
+  // 3. Fetch Event Requirements for Backend Domain Validation
+  const { data: eventData, error: eventError } = await supabase
+    .from('events')
+    .select('form_requirements')
+    .eq('id', eventId)
+    .single()
+
+  if (eventError || !eventData) {
+    return { error: 'Event not found.' }
+  }
+
+  const reqs = eventData.form_requirements || {}
+  if (!reqs.allow_external_students) {
+    for (const email of allIncomingEmails) {
+      if (email && !email.toLowerCase().endsWith('@srmap.edu.in')) {
+        return { error: 'All team members must use @srmap.edu.in email addresses for this event.' }
+      }
+    }
+  }
+
   // Fetch all existing registrations for this event to check against
   const { data: existingRegs } = await supabase
     .from('registrations')
@@ -58,17 +78,20 @@ export async function submitPublicRegistration(eventId: string, formData: any) {
   const baseFormData = { ...formData }
   delete baseFormData.teamMembers
   delete baseFormData.teamLeadIndex
+  delete baseFormData.teamName
 
   // 5. Insert into Supabase registrations table
-  const { error } = await supabase
+  const { data: insertedData, error } = await supabase
     .from('registrations')
     .insert([{
       event_id: eventId,
       lead_email: leadEmail,
       form_data: baseFormData,
-      team_data: teamMembers.length > 0 ? { members: teamMembers, leadIndex: teamLeadIndex } : null,
+      team_data: teamMembers.length > 0 ? { members: teamMembers, leadIndex: teamLeadIndex, teamName: formData.teamName } : null,
       hash_payload: hashPayload
     }])
+    .select('*')
+    .single()
 
   if (error) {
     // 23505 is PostgreSQL code for unique_violation, but we removed the strict constraint on user_id+event_id.
@@ -82,5 +105,41 @@ export async function submitPublicRegistration(eventId: string, formData: any) {
   // 6. Revalidate cache so the UI updates
   revalidatePath('/events')
 
-  return { success: true, hash_payload: hashPayload }
+  return { success: true, hash_payload: hashPayload, registration: insertedData }
+}
+
+export async function lookupTeamRegistration(eventId: string, email: string) {
+  const supabase = await createClient()
+
+  // First check if they are the primary registrant
+  const { data: primaryReg } = await supabase
+    .from('registrations')
+    .select('*')
+    .eq('event_id', eventId)
+    .eq('lead_email', email.toLowerCase().trim())
+    .single()
+
+  if (primaryReg) {
+    return { success: true, hash_payload: primaryReg.hash_payload, registration: primaryReg }
+  }
+
+  // If not primary, search through the team_data arrays
+  const { data: allRegs } = await supabase
+    .from('registrations')
+    .select('*')
+    .eq('event_id', eventId)
+
+  if (allRegs) {
+    for (const reg of allRegs) {
+      if (reg.team_data && reg.team_data.members) {
+        for (const member of reg.team_data.members) {
+          if (member.email && member.email.toLowerCase().trim() === email.toLowerCase().trim()) {
+            return { success: true, hash_payload: reg.hash_payload, registration: reg }
+          }
+        }
+      }
+    }
+  }
+
+  return { error: "No registration found for that email address. Make sure you entered the correct email used during registration." }
 }

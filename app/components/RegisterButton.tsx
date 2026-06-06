@@ -198,6 +198,9 @@ export default function RegisterButton({ eventId, eventTitle, isRegistrationOpen
                   {teamSize > 1 && (
                     <div className="flex flex-col gap-6 p-5 bg-white/5 rounded-xl border border-white/10 mb-6">
                       <div className="flex flex-col gap-2 mb-2 border-b border-white/10 pb-6">
+                        <label className="text-[13px] font-semibold text-blue-400 uppercase tracking-wider">Team Name</label>
+                        <input type="text" name="teamName" required placeholder="Enter a cool team name" className="p-3 bg-black/40 border border-blue-500/30 rounded-xl text-white focus:outline-none focus:border-blue-500 w-full mb-4" />
+                        
                         <label className="text-[13px] font-semibold text-blue-400 uppercase tracking-wider">Who is the Team Lead?</label>
                         <select value={teamLeadIndex} onChange={(e) => setTeamLeadIndex(parseInt(e.target.value))} className="p-3 bg-black/40 border border-blue-500/30 rounded-xl text-white focus:outline-none focus:border-blue-500">
                           <option value={0}>Me (Primary Registrant)</option>
