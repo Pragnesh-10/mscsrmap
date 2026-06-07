@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Syne, DM_Mono, Instrument_Serif } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
+const syne = Syne({ subsets: ["latin"], variable: "--font-syne" });
+const dmMono = DM_Mono({ weight: ["400", "500"], subsets: ["latin"], variable: "--font-dm-mono" });
+const instrumentSerif = Instrument_Serif({ weight: ["400"], subsets: ["latin"], variable: "--font-instrument-serif" });
 
 export const metadata: Metadata = {
   title: "Microsoft Student Community - SRM University AP",
@@ -19,7 +22,7 @@ export default function RootLayout({
       <head>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" crossOrigin="anonymous" />
       </head>
-      <body className={`${inter.className} min-h-screen bg-[#0a0a0b] text-[#ededed] relative`}>
+      <body className={`${inter.variable} ${syne.variable} ${dmMono.variable} ${instrumentSerif.variable} ${inter.className} min-h-screen bg-[#0a0a0b] text-[#ededed] relative`}>
         {children}
       </body>
     </html>

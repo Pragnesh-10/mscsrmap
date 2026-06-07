@@ -4,7 +4,7 @@
   --text-primary: #ededed;
   --text-secondary: rgba(255, 255, 255, .6);
   --text-muted: rgba(255, 255, 255, .4);
-  --border: rgba(255, 255, 255, .1);
+  --portal-border: rgba(255, 255, 255, .1);
   --surface: #0a0a0b;
 }
 
@@ -48,7 +48,7 @@
 .event-card {
   background: transparent;
   border: none;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--portal-border);
   border-radius: 0;
   padding: 3rem 0;
   display: grid;
@@ -92,7 +92,7 @@
     align-items: baseline;
     gap: 0.5rem;
     padding-bottom: 0.5rem;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--portal-border);
     margin-bottom: 0.5rem;
     width: fit-content;
   }
@@ -197,7 +197,7 @@
   display: none;
   margin-top: 1.5rem;
   padding-top: 1.5rem;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--portal-border);
   color: var(--text-secondary);
   font-size: 0.9rem;
   line-height: 1.6;

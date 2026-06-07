@@ -106,7 +106,7 @@ export default async function EventPage(props: {
               <div className="flex flex-wrap gap-6 text-sm text-white/50 bg-black/20 p-5 rounded-2xl border border-white/5 inline-flex">
                 <div className="flex items-center gap-2">
                   <i className="fas fa-calendar-alt text-blue-400"></i>
-                  <span>{new Date(evt.date_start).toLocaleString()}</span>
+                  <span>{new Date(evt.date_start).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</span>
                 </div>
                 {evt.location && (
                   <div className="flex items-center gap-2">

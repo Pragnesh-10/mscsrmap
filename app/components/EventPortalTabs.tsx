@@ -3,13 +3,12 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { QRCodeSVG } from 'qrcode.react'
-// @ts-ignore
-import domtoimage from 'dom-to-image-more'
 import { submitPublicRegistration, lookupTeamRegistration, joinMatchmakingTeam } from '../events/actions'
 
 export default function EventPortalTabs({ event, isWaitlistMode = false, openTeams = [], invitedTeam = null }: { event: any, isWaitlistMode?: boolean, openTeams?: any[], invitedTeam?: any }) {
   const [activeTab, setActiveTab] = useState<'register' | 'matchmaking' | 'check' | 'certificate'>('register')
   const [mounted, setMounted] = useState(false)
+  const [isCreatingTeam, setIsCreatingTeam] = useState(false)
 
   // Registration State
   const [loading, setLoading] = useState(false)
@@ -101,8 +100,10 @@ export default function EventPortalTabs({ event, isWaitlistMode = false, openTea
 
     baseData.teamMembers = teamMembers
     baseData.teamLeadIndex = teamLeadIndex
-    if (teamSize > 1) {
+    
+    if (isCreatingTeam) {
       baseData.teamName = formData.get('teamName')
+      baseData.lookingForMembers = formData.get('lookingForMembers') === 'on'
     }
 
     const res = await submitPublicRegistration(event.id, baseData)
@@ -170,6 +171,8 @@ export default function EventPortalTabs({ event, isWaitlistMode = false, openTea
   async function downloadTicket() {
     if (!ticketRef.current) return;
     try {
+      // @ts-ignore
+      const domtoimage = (await import('dom-to-image-more')).default
       const dataUrl = await domtoimage.toPng(ticketRef.current, { bgcolor: '#18181b', scale: 2 })
       const link = document.createElement('a')
       link.download = `Event-Ticket-${currentHash?.substring(0, 8)}.png`
@@ -184,6 +187,8 @@ export default function EventPortalTabs({ event, isWaitlistMode = false, openTea
     const certEl = document.getElementById('certificate-node')
     if (!certEl) return;
     try {
+      // @ts-ignore
+      const domtoimage = (await import('dom-to-image-more')).default
       const dataUrl = await domtoimage.toPng(certEl, { bgcolor: '#0a0a0b', scale: 2 })
       const link = document.createElement('a')
       link.download = `${event.title}-Certificate.png`
@@ -283,7 +288,7 @@ export default function EventPortalTabs({ event, isWaitlistMode = false, openTea
                     {currentTeamId && (
                       <button 
                         onClick={() => {
-                          const inviteUrl = `${window.location.origin}/events/${event.slug}?invite=${currentTeamId}`;
+                          const inviteUrl = `${window.location.origin}/events/${event.slug || event.id}?invite=${currentTeamId}`;
                           navigator.clipboard.writeText(inviteUrl);
                           alert("Invite link copied to clipboard!");
                         }} 
@@ -368,31 +373,39 @@ export default function EventPortalTabs({ event, isWaitlistMode = false, openTea
                   {reqs.allow_teams && reqs.max_team_size && reqs.max_team_size > 1 && (
                     <div className="mt-4 pt-6 border-t border-white/10">
                       <h4 className="text-lg font-bold text-white mb-4">Team Registration (Optional)</h4>
-                      <div className="flex flex-col gap-2 mb-6">
-                        <label className="text-[13px] font-semibold text-[#a1a1aa] uppercase tracking-wider">Total Team Size</label>
-                        <select value={teamSize} onChange={(e) => setTeamSize(parseInt(e.target.value))} className="p-3 bg-black/40 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500 w-full md:w-1/3">
-                          {Array.from({length: reqs.max_team_size}, (_, i) => i + 1).map(num => (
-                            <option key={num} value={num}>{num === 1 ? '1 (Solo)' : num}</option>
-                          ))}
-                        </select>
+                      
+                      <div className="flex items-center gap-3 mb-6 p-4 bg-white/5 border border-white/10 rounded-xl">
+                        <input type="checkbox" id="createTeamToggle" checked={isCreatingTeam} onChange={(e) => { setIsCreatingTeam(e.target.checked); if(!e.target.checked) setTeamSize(1); }} className="w-5 h-5 accent-blue-500 rounded border-white/20 bg-black/50" />
+                        <label htmlFor="createTeamToggle" className="text-sm font-semibold text-white cursor-pointer select-none">I want to create or register a Team</label>
                       </div>
 
-                      {teamSize > 1 && (
+                      {isCreatingTeam && (
                         <div className="flex flex-col gap-6 p-5 bg-white/5 rounded-xl border border-white/10 mb-6">
                           <div className="flex flex-col gap-2 mb-2 border-b border-white/10 pb-6">
                             <label className="text-[13px] font-semibold text-blue-400 uppercase tracking-wider">Team Name</label>
                             <input type="text" name="teamName" required placeholder="Enter a cool team name" className="p-3 bg-black/40 border border-blue-500/30 rounded-xl text-white focus:outline-none focus:border-blue-500 w-full mb-4" />
                             
-                            <label className="text-[13px] font-semibold text-blue-400 uppercase tracking-wider">Who is the Team Lead?</label>
-                            <select value={teamLeadIndex} onChange={(e) => setTeamLeadIndex(parseInt(e.target.value))} className="p-3 bg-black/40 border border-blue-500/30 rounded-xl text-white focus:outline-none focus:border-blue-500">
-                              <option value={0}>Me (Primary Registrant)</option>
-                              {Array.from({length: teamSize - 1}, (_, i) => i + 1).map(num => (
-                                <option key={num} value={num}>Member {num + 1}</option>
+                            <label className="text-[13px] font-semibold text-blue-400 uppercase tracking-wider">How many members are you registering right now?</label>
+                            <select value={teamSize} onChange={(e) => setTeamSize(parseInt(e.target.value))} className="p-3 bg-black/40 border border-blue-500/30 rounded-xl text-white focus:outline-none focus:border-blue-500 w-full md:w-1/2 mb-4">
+                              {Array.from({length: reqs.max_team_size}, (_, i) => i + 1).map(num => (
+                                <option key={num} value={num}>{num === 1 ? 'Just me (1)' : `${num} Members`}</option>
                               ))}
                             </select>
+
+                            {teamSize > 1 && (
+                              <>
+                                <label className="text-[13px] font-semibold text-blue-400 uppercase tracking-wider mt-2">Who is the Team Lead?</label>
+                                <select value={teamLeadIndex} onChange={(e) => setTeamLeadIndex(parseInt(e.target.value))} className="p-3 bg-black/40 border border-blue-500/30 rounded-xl text-white focus:outline-none focus:border-blue-500 w-full md:w-1/2">
+                                  <option value={0}>Me (Primary Registrant)</option>
+                                  {Array.from({length: teamSize - 1}, (_, i) => i + 1).map(num => (
+                                    <option key={num} value={num}>Member {num + 1}</option>
+                                  ))}
+                                </select>
+                              </>
+                            )}
                           </div>
 
-                          {Array.from({length: teamSize - 1}, (_, i) => i + 1).map(num => (
+                          {teamSize > 1 && Array.from({length: teamSize - 1}, (_, i) => i + 1).map(num => (
                             <div key={num} className="flex flex-col gap-4 pt-4 first:pt-0 border-t border-white/5">
                               <h5 className="text-sm font-bold text-white/80 mt-4">Member {num + 1} Details</h5>
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -435,20 +448,21 @@ export default function EventPortalTabs({ event, isWaitlistMode = false, openTea
                               </div>
                             </div>
                           ))}
+
+                          {teamSize < reqs.max_team_size && (
+                            <div className="flex flex-col gap-3 p-5 bg-cyan-500/10 border border-cyan-500/20 rounded-xl mt-4">
+                              <label className="flex items-start gap-3 cursor-pointer">
+                                <input type="checkbox" name="lookingForMembers" className="w-5 h-5 mt-0.5 accent-cyan-500 rounded border-white/20 bg-black/50" />
+                                <div>
+                                  <span className="text-sm font-bold text-cyan-400 block">Make my Team Public (Matchmaking)</span>
+                                  <span className="text-[11px] text-white/50 block mt-1">If checked, your team will appear in the "Find a Team" tab so other participants can join you! If left unchecked, your team will remain Private (you can still invite friends via a secret link).</span>
+                                </div>
+                              </label>
+                            </div>
+                          )}
+
                         </div>
                       )}
-                    </div>
-                  )}
-
-                  {reqs.allow_teams && teamSize > 1 && teamSize < reqs.max_team_size && (
-                    <div className="flex flex-col gap-3 p-5 bg-cyan-500/10 border border-cyan-500/20 rounded-xl mt-4">
-                      <label className="flex items-center gap-3 cursor-pointer">
-                        <input type="checkbox" name="lookingForMembers" className="w-5 h-5 accent-cyan-500 rounded border-white/20 bg-black/50" />
-                        <div>
-                          <span className="text-sm font-bold text-cyan-400 block">Looking for more team members?</span>
-                          <span className="text-xs text-white/50 block mt-1">If checked, we'll feature your team on the public Matchmaking board so solos can join you!</span>
-                        </div>
-                      </label>
                     </div>
                   )}
 
@@ -585,7 +599,7 @@ export default function EventPortalTabs({ event, isWaitlistMode = false, openTea
                         __html: reqs.certificate_html
                           .replace(/\{\{NAME\}\}/g, currentReg.team_data?.teamName || currentReg.form_data?.fullName || '')
                           .replace(/\{\{EVENT_TITLE\}\}/g, event.title || '')
-                          .replace(/\{\{EVENT_DATE\}\}/g, new Date(event.date_start).toLocaleDateString())
+                          .replace(/\{\{EVENT_DATE\}\}/g, new Date(event.date_start).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }))
                           .replace(/\{\{COLLEGE_NAME\}\}/g, currentReg.form_data?.collegeName || 'SRMAP')
                       }}
                     />
@@ -631,7 +645,7 @@ export default function EventPortalTabs({ event, isWaitlistMode = false, openTea
                         <div className="flex flex-col items-center w-48">
                           <div className="h-px w-full bg-white/60 mb-2"></div>
                           <span className="text-xs text-white/80 uppercase tracking-widest font-bold">Event Date</span>
-                          <span className="text-sm text-white/90 mt-1 font-semibold">{new Date(event.date_start).toLocaleDateString()}</span>
+                          <span className="text-sm text-white/90 mt-1 font-semibold">{new Date(event.date_start).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}</span>
                         </div>
                       </div>
                     </div>
@@ -669,7 +683,7 @@ export default function EventPortalTabs({ event, isWaitlistMode = false, openTea
                 )}
                 {event.date_start && (
                   <p className="text-xs text-white/60 mt-1 flex items-center justify-center gap-1">
-                    <i className="fas fa-calendar-alt"></i> {new Date(event.date_start).toLocaleDateString()}
+                    <i className="fas fa-calendar-alt"></i> {new Date(event.date_start).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}
                   </p>
                 )}
               </div>

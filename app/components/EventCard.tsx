@@ -4,8 +4,8 @@ import React from 'react'
 
 export default function EventCard({ event, isPast }: { event: any, isPast: boolean }) {
   const date = new Date(event.date_start)
-  const month = date.toLocaleString('default', { month: 'short' }).toUpperCase()
-  const day = date.getDate()
+  const month = date.toLocaleString('en-IN', { month: 'short', timeZone: 'Asia/Kolkata' }).toUpperCase()
+  const day = parseInt(date.toLocaleString('en-IN', { day: 'numeric', timeZone: 'Asia/Kolkata' }), 10)
 
   return (
     <div 

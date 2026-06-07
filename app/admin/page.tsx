@@ -5,6 +5,9 @@ import { createClient } from '@/utils/supabase/client'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import Link from 'next/link'
 import AnalyticsDashboard from './AnalyticsDashboard'
+import SettingsTab from './SettingsTab'
+import AboutTab from './AboutTab'
+import PasswordRequestsTab from './PasswordRequestsTab'
 import { logAudit, fetchAuditLogs } from './audit_actions'
 
 export default function AdminPage() {
@@ -325,11 +328,23 @@ export default function AdminPage() {
             <>
               <button onClick={() => setActiveTab('users')} className={`px-5 py-3 rounded-xl font-medium transition-all text-left ${activeTab === 'users' ? 'bg-gradient-to-br from-blue-500 to-purple-500 text-white shadow-[0_4px_15px_rgba(59,130,246,0.25)]' : 'text-[#a1a1aa] hover:text-white hover:bg-white/5'}`}>User Access</button>
               <button onClick={() => setActiveTab('audit')} className={`px-5 py-3 rounded-xl font-medium transition-all text-left ${activeTab === 'audit' ? 'bg-gradient-to-br from-blue-500 to-purple-500 text-white shadow-[0_4px_15px_rgba(59,130,246,0.25)]' : 'text-[#a1a1aa] hover:text-white hover:bg-white/5'}`}>Audit Logs</button>
+              <button onClick={() => setActiveTab('password_reqs')} className={`px-5 py-3 rounded-xl font-medium transition-all text-left flex justify-between items-center ${activeTab === 'password_reqs' ? 'bg-gradient-to-br from-yellow-500 to-orange-500 text-white shadow-[0_4px_15px_rgba(234,179,8,0.25)]' : 'text-[#a1a1aa] hover:text-white hover:bg-white/5'}`}>
+                <span>Passwords</span>
+              </button>
             </>
           )}
           <button onClick={() => setActiveTab('events')} className={`px-5 py-3 rounded-xl font-medium transition-all text-left ${activeTab === 'events' ? 'bg-gradient-to-br from-blue-500 to-purple-500 text-white shadow-[0_4px_15px_rgba(59,130,246,0.25)]' : 'text-[#a1a1aa] hover:text-white hover:bg-white/5'}`}>Events</button>
           <button onClick={() => setActiveTab('team')} className={`px-5 py-3 rounded-xl font-medium transition-all text-left ${activeTab === 'team' ? 'bg-gradient-to-br from-blue-500 to-purple-500 text-white shadow-[0_4px_15px_rgba(59,130,246,0.25)]' : 'text-[#a1a1aa] hover:text-white hover:bg-white/5'}`}>Team Members</button>
           <button onClick={() => setActiveTab('analytics')} className={`px-5 py-3 rounded-xl font-medium transition-all text-left ${activeTab === 'analytics' ? 'bg-gradient-to-br from-blue-500 to-purple-500 text-white shadow-[0_4px_15px_rgba(59,130,246,0.25)]' : 'text-[#a1a1aa] hover:text-white hover:bg-white/5'}`}>Analytics</button>
+          
+          <div className="h-px bg-white/10 my-2"></div>
+          
+          <button onClick={() => setActiveTab('settings')} className={`px-5 py-3 rounded-xl font-medium transition-all text-left ${activeTab === 'settings' ? 'bg-gradient-to-br from-blue-500 to-purple-500 text-white shadow-[0_4px_15px_rgba(59,130,246,0.25)]' : 'text-[#a1a1aa] hover:text-white hover:bg-white/5'}`}>
+            <i className="fas fa-cog w-5"></i> Settings
+          </button>
+          <button onClick={() => setActiveTab('about')} className={`px-5 py-3 rounded-xl font-medium transition-all text-left ${activeTab === 'about' ? 'bg-gradient-to-br from-blue-500 to-purple-500 text-white shadow-[0_4px_15px_rgba(59,130,246,0.25)]' : 'text-[#a1a1aa] hover:text-white hover:bg-white/5'}`}>
+            <i className="fas fa-info-circle w-5"></i> About
+          </button>
         </div>
       </aside>
 
@@ -560,7 +575,7 @@ export default function AdminPage() {
                               {evt.title} <i className="fas fa-external-link-alt text-[10px]"></i>
                             </Link>
                           </td>
-                          <td className="p-5 border-b border-white/5">{new Date(evt.date_start).toLocaleString()}</td>
+                          <td className="p-5 border-b border-white/5">{new Date(evt.date_start).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</td>
                           <td className="p-5 border-b border-white/5"><span className={`px-3 py-1 border rounded-full text-xs font-bold uppercase tracking-wider ${evt.status === 'upcoming' ? 'bg-green-500/15 text-green-500 border-green-500/30' : 'bg-gray-500/15 text-gray-400 border-gray-500/30'}`}>{evt.status}</span></td>
                           <td className="p-5 border-b border-white/5 text-right space-x-2">
                             <span className={`text-sm mr-4 ${statusMsg?.id === `event_${evt.id}` ? (statusMsg.type === 'error' ? 'text-red-500' : statusMsg.type === 'success' ? 'text-green-500' : 'text-gray-400') : 'hidden'}`}>{statusMsg?.id === `event_${evt.id}` ? statusMsg.msg : ''}</span>
@@ -704,7 +719,7 @@ export default function AdminPage() {
                     <tbody>
                       {auditLogs.map((log) => (
                         <tr key={log.id} className="border-b border-white/5 hover:bg-white/5 transition-colors group">
-                          <td className="p-4 text-xs text-white/60 whitespace-nowrap">{new Date(log.created_at).toLocaleString()}</td>
+                          <td className="p-4 text-xs text-white/60 whitespace-nowrap">{new Date(log.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</td>
                           <td className="p-4 text-sm font-bold text-blue-400">{log.admin_email}</td>
                           <td className="p-4">
                             <span className="px-2 py-1 bg-white/10 text-white text-[10px] font-black tracking-widest rounded-md border border-white/10">
@@ -725,6 +740,14 @@ export default function AdminPage() {
             </div>
           )}
 
+          {/* PASSWORD REQUESTS TAB (Admins Only) */}
+          {activeTab === 'password_reqs' && userRole === 'admin' && <PasswordRequestsTab />}
+
+          {/* SETTINGS TAB */}
+          {activeTab === 'settings' && <SettingsTab />}
+
+          {/* ABOUT TAB */}
+          {activeTab === 'about' && <AboutTab />}
         </div>
       </main>
     </div>

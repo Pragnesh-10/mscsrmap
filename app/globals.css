@@ -18,7 +18,7 @@
   --text-primary: #ededed;
   --text-secondary: rgba(255, 255, 255, 0.6);
   --text-muted: rgba(255, 255, 255, 0.4);
-  --border: rgba(255, 255, 255, 0.1);
+  --portal-border: rgba(255, 255, 255, 0.1);
   --surface: #0a0a0b;
 }
 
@@ -40,7 +40,7 @@ body {
     background: rgba(255, 255, 255, 0.03);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
-    border: 1px solid var(--border);
+    border: 1px solid var(--portal-border);
     border-radius: 12px;
   }
 }

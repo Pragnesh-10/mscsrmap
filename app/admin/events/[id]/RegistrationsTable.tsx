@@ -66,7 +66,7 @@ export default function RegistrationsTable({ registrations, eventTitle, eventId 
       const teamName = reg.team_data?.teamName || 'N/A'
       const teamSize = reg.team_data?.members ? reg.team_data.members.length + 1 : 1
       const primaryName = reg.form_data?.fullName || 'N/A'
-      const date = new Date(reg.created_at).toLocaleString()
+      const date = new Date(reg.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })
       const status = reg.checked_in ? 'Checked In' : 'Pending'
       
       rows.push([
@@ -223,7 +223,7 @@ export default function RegistrationsTable({ registrations, eventTitle, eventId 
                           <span className="text-orange-400 bg-orange-500/10 px-2 py-1 rounded-md text-xs font-bold border border-orange-500/20"><i className="fas fa-clock mr-1"></i> Pending</span>
                         )}
                       </td>
-                      <td className="p-5 text-right text-sm text-white/50">{new Date(reg.created_at).toLocaleDateString()}</td>
+                      <td className="p-5 text-right text-sm text-white/50">{new Date(reg.created_at).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}</td>
                     </tr>
                     
                     {isExpanded && isTeam && (

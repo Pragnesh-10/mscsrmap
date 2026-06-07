@@ -83,3 +83,33 @@ export async function updateRegistrationDetails(eventId: string, regId: string, 
   await logAudit('UPDATE_REGISTRATION', { event_id: eventId, reg_id: regId, lead_email: leadEmail })
   return { success: true }
 }
+
+export async function updateEventDetails(eventId: string, updateData: any) {
+  const supabase = await createClient()
+
+  // Verify access
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) return { error: 'Unauthorized' }
+
+  const { data: profile } = await supabase
+    .from('member_profiles')
+    .select('role')
+    .eq('id', session.user.id)
+    .single()
+
+  if (!profile || profile.role !== 'admin') {
+    return { error: 'Unauthorized' }
+  }
+
+  const { error } = await supabase
+    .from('events')
+    .update(updateData)
+    .eq('id', eventId)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/admin')
+  revalidatePath('/events', 'layout')
+  await logAudit('UPDATE_EVENT', { event_id: eventId, title: updateData.title })
+  return { success: true }
+}

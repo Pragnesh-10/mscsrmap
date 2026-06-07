@@ -30,7 +30,7 @@ serve(async (req) => {
         {
           title: `🚀 New Team Forming: ${record.team_name}`,
           description: "A team is looking for more members! Check out the Team Lead's details below and jump in.",
-          url: "https://msc-srmap.vercel.app/events", // Change to your production Firebase URL
+          url: "https://[YOUR_FIREBASE_PROJECT_ID].web.app/events", // Change to your production Firebase URL
           color: 30932, // Microsoft Blue hex (#0078D4) converted to Integer
           fields: [
             {
@@ -43,6 +43,19 @@ serve(async (req) => {
             text: "Microsoft Student Community • Matchmaking Sandbox"
           },
           timestamp: new Date().toISOString()
+        }
+      ],
+      components: [
+        {
+          type: 1,
+          components: [
+            {
+              type: 2,
+              style: 5,
+              label: "View All Events",
+              url: "https://[YOUR_FIREBASE_PROJECT_ID].web.app/events", // Change to your production Firebase URL
+            }
+          ]
         }
       ]
     }

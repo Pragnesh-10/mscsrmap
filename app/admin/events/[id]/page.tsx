@@ -13,6 +13,15 @@ export default async function AdminEventViewer({ params }: { params: Promise<{ i
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) return notFound()
 
+  // Fetch user role
+  const { data: profile } = await supabase
+    .from('member_profiles')
+    .select('role')
+    .eq('id', session.user.id)
+    .single()
+
+  const userRole = profile?.role
+
   // Fetch Event
   const { data: event, error: eventError } = await supabase
     .from('events')
@@ -43,7 +52,7 @@ export default async function AdminEventViewer({ params }: { params: Promise<{ i
             <div>
               <h1 className="text-3xl font-bold text-white mb-2">{event.title}</h1>
               <p className="text-white/40 text-sm">
-                <i className="fas fa-calendar-alt mr-2 text-blue-400"></i> {new Date(event.date_start).toLocaleString()}
+                <i className="fas fa-calendar-alt mr-2 text-blue-400"></i> {new Date(event.date_start).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
               </p>
             </div>
             <div className="text-right">
@@ -59,6 +68,11 @@ export default async function AdminEventViewer({ params }: { params: Promise<{ i
             <Link href={`/admin/events/${id}/scanner`} className="px-6 py-3 bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500 hover:text-white rounded-xl font-bold transition-colors flex items-center gap-3">
               <i className="fas fa-qrcode"></i> Open Live Scanner
             </Link>
+            {userRole === 'admin' && (
+              <Link href={`/admin/events/${id}/edit`} className="px-6 py-3 bg-white/5 text-white/80 border border-white/10 hover:bg-white/10 hover:text-white rounded-xl font-bold transition-colors flex items-center gap-3">
+                <i className="fas fa-edit"></i> Edit Event Details
+              </Link>
+            )}
           </div>
 
           <RegistrationsTable registrations={registrations || []} eventTitle={event.title} eventId={id} />

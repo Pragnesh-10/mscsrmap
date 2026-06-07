@@ -1,11 +1,11 @@
 'use server'
 
-import { createClient } from '@/utils/supabase/server'
+import { createAdminClient } from '@/utils/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import crypto from 'crypto'
 
 export async function submitPublicRegistration(eventId: string, formData: any) {
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   const leadEmail = formData.email?.toLowerCase().trim()
 
@@ -143,7 +143,7 @@ export async function submitPublicRegistration(eventId: string, formData: any) {
   }
 
   // 8. Revalidate cache so the UI updates
-  revalidatePath('/events')
+  revalidatePath('/events', 'layout')
 
   return { 
     success: true, 
@@ -155,7 +155,7 @@ export async function submitPublicRegistration(eventId: string, formData: any) {
 }
 
 export async function lookupTeamRegistration(eventId: string, email: string) {
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   // First check if they are the primary registrant
   const { data: primaryReg } = await supabase
@@ -191,7 +191,7 @@ export async function lookupTeamRegistration(eventId: string, email: string) {
 }
 
 export async function joinMatchmakingTeam(teamId: string, memberData: any) {
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   // 1. Fetch the matchmaking team to get the registration link
   const { data: team, error: teamError } = await supabase
@@ -248,7 +248,7 @@ export async function joinMatchmakingTeam(teamId: string, memberData: any) {
     await supabase.from('teams').update({ looking_for_members: false }).eq('id', teamId)
   }
 
-  revalidatePath('/events')
+  revalidatePath('/events', 'layout')
   
   // Return the team's hash payload so the new member can view their ticket instantly
   return { success: true, hash_payload: reg.hash_payload }
