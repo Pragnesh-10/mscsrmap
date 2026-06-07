@@ -7,7 +7,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import domtoimage from 'dom-to-image-more'
 import { submitPublicRegistration, lookupTeamRegistration, joinMatchmakingTeam } from '../events/actions'
 
-export default function EventPortalTabs({ event, isWaitlistMode = false, openTeams = [] }: { event: any, isWaitlistMode?: boolean, openTeams?: any[] }) {
+export default function EventPortalTabs({ event, isWaitlistMode = false, openTeams = [], invitedTeam = null }: { event: any, isWaitlistMode?: boolean, openTeams?: any[], invitedTeam?: any }) {
   const [activeTab, setActiveTab] = useState<'register' | 'matchmaking' | 'check' | 'certificate'>('register')
   const [mounted, setMounted] = useState(false)
 
@@ -15,6 +15,7 @@ export default function EventPortalTabs({ event, isWaitlistMode = false, openTea
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [currentHash, setCurrentHash] = useState<string | null>(null)
+  const [currentTeamId, setCurrentTeamId] = useState<string | null>(null)
   const [currentReg, setCurrentReg] = useState<any>(null)
   const [showTicketModal, setShowTicketModal] = useState(false)
   const [showWaitlistModal, setShowWaitlistModal] = useState(false)
@@ -42,7 +43,12 @@ export default function EventPortalTabs({ event, isWaitlistMode = false, openTea
 
   useEffect(() => {
     setMounted(true)
-  }, [])
+    // If user opened an invite link, automatically pop the Join Team modal
+    if (invitedTeam) {
+      setActiveTab('matchmaking')
+      setSelectedJoinTeam(invitedTeam)
+    }
+  }, [invitedTeam])
 
   async function handleRegistrationSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -109,6 +115,7 @@ export default function EventPortalTabs({ event, isWaitlistMode = false, openTea
         setShowWaitlistModal(true)
       } else {
         setCurrentHash(res.hash_payload)
+        if (res.team_id) setCurrentTeamId(res.team_id)
         if (res.registration) {
           setCurrentReg(res.registration)
         }
@@ -269,9 +276,23 @@ export default function EventPortalTabs({ event, isWaitlistMode = false, openTea
                   </div>
                   <h3 className="text-xl font-bold text-green-400 mb-2">You are Registered!</h3>
                   <p className="text-green-400/60 text-sm mb-6">Your registration was successful. Keep your ticket safe!</p>
-                  <button onClick={() => setShowTicketModal(true)} className="px-6 py-3 bg-green-500 hover:bg-green-600 rounded-xl font-bold transition-colors text-white">
-                    View My Ticket
-                  </button>
+                  <div className="flex gap-4">
+                    <button onClick={() => setShowTicketModal(true)} className="px-6 py-3 bg-green-500 hover:bg-green-600 rounded-xl font-bold transition-colors text-white">
+                      View My Ticket
+                    </button>
+                    {currentTeamId && (
+                      <button 
+                        onClick={() => {
+                          const inviteUrl = `${window.location.origin}/events/${event.slug}?invite=${currentTeamId}`;
+                          navigator.clipboard.writeText(inviteUrl);
+                          alert("Invite link copied to clipboard!");
+                        }} 
+                        className="px-6 py-3 bg-white/10 hover:bg-white/20 border border-white/10 rounded-xl font-bold transition-colors text-white flex items-center gap-2"
+                      >
+                        <i className="fas fa-link"></i> Copy Invite Link
+                      </button>
+                    )}
+                  </div>
                  </div>
               ) : (
                 <form onSubmit={handleRegistrationSubmit} className="flex flex-col gap-6">

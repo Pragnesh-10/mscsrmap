@@ -6,15 +6,22 @@ import { notFound } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
 
-export default async function EventPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function EventPage(props: { 
+  params: Promise<{ slug: string }>, 
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }> 
+}) {
   const supabase = await createClient()
-  const { slug } = await params
+  const { slug } = await props.params
+  const searchParams = await props.searchParams
+  const inviteId = searchParams?.invite as string | undefined
 
-  // Fetch event details by slug
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug)
+
+  // Fetch event details by slug or ID
   const { data: evt, error } = await supabase
     .from('events')
     .select('*')
-    .eq('slug', slug)
+    .or(`slug.eq.${slug}${isUUID ? `,id.eq.${slug}` : ''}`)
     .single()
 
   if (error || !evt) {
@@ -42,6 +49,7 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
 
   // Fetch Matchmaking Teams
   let openTeams: any[] = []
+  let invitedTeam: any = null
   if (evt.form_requirements?.allow_teams) {
     const { data: teamsData } = await supabase
       .from('teams')
@@ -50,6 +58,16 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
       .eq('looking_for_members', true)
       
     if (teamsData) openTeams = teamsData
+
+    if (inviteId) {
+      const { data: specificTeam } = await supabase
+        .from('teams')
+        .select('*')
+        .eq('id', inviteId)
+        .single()
+      
+      if (specificTeam) invitedTeam = specificTeam
+    }
   }
 
   return (
@@ -100,7 +118,7 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
             </div>
           </div>
 
-          <EventPortalTabs event={evt} isWaitlistMode={isWaitlistMode} openTeams={openTeams} />
+          <EventPortalTabs event={evt} isWaitlistMode={isWaitlistMode} openTeams={openTeams} invitedTeam={invitedTeam} />
         </div>
       </main>
     </>

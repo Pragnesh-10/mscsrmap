@@ -119,24 +119,27 @@ export async function submitPublicRegistration(eventId: string, formData: any) {
     return { error: error.message }
   }
 
-  // 7. Matchmaking Hook: If they want more members, create a team row
-  if (formData.lookingForMembers && formData.teamName) {
+  // 7. Team Creation Hook: If they registered a team, create a team row for invite links
+  let createdTeamId = null
+  if (formData.teamName) {
     const leaderFullName = baseFormData.fullName || ''
     const leaderEmail = leadEmail
     const leaderBranch = baseFormData.branch || ''
     const leaderYear = baseFormData.year || ''
 
-    await supabase.from('teams').insert([{
+    const { data: newTeam } = await supabase.from('teams').insert([{
       registration_id: insertedData.id,
       event_id: eventId,
       team_name: formData.teamName,
       max_team_size: eventData.form_requirements?.max_team_size || 4,
-      looking_for_members: true,
+      looking_for_members: !!formData.lookingForMembers, // True if checked, false otherwise
       leader_name: leaderFullName,
       leader_email: leaderEmail,
       leader_branch: leaderBranch,
       leader_year: leaderYear
-    }])
+    }]).select('id').single()
+
+    if (newTeam) createdTeamId = newTeam.id
   }
 
   // 8. Revalidate cache so the UI updates
@@ -146,7 +149,8 @@ export async function submitPublicRegistration(eventId: string, formData: any) {
     success: true, 
     hash_payload: hashPayload, 
     registration: insertedData,
-    isWaitlisted: assignedStatus === 'waitlisted'
+    isWaitlisted: assignedStatus === 'waitlisted',
+    team_id: createdTeamId
   }
 }
 
@@ -196,8 +200,8 @@ export async function joinMatchmakingTeam(teamId: string, memberData: any) {
     .eq('id', teamId)
     .single()
 
-  if (teamError || !team || !team.looking_for_members) {
-    return { error: 'Team not found or is no longer accepting members.' }
+  if (teamError || !team) {
+    return { error: 'Team not found.' }
   }
 
   // 2. Fetch the actual registration data
@@ -219,14 +223,19 @@ export async function joinMatchmakingTeam(teamId: string, memberData: any) {
     }
   }
 
-  // 4. Append the new member
+  // 6. Check Capacity
+  if (existingMembers.length + 1 >= team.max_team_size) {
+    return { error: 'This team is already at maximum capacity.' }
+  }
+
+  // 7. Append the new member
   const newMembers = [...existingMembers, memberData]
   const newTeamData = {
     ...reg.team_data,
     members: newMembers
   }
 
-  // 5. Update Registration
+  // 8. Update Registration
   const { error: updateError } = await supabase
     .from('registrations')
     .update({ team_data: newTeamData })
@@ -234,7 +243,7 @@ export async function joinMatchmakingTeam(teamId: string, memberData: any) {
 
   if (updateError) return { error: 'Failed to join team.' }
 
-  // 6. If the team is now full, close the matchmaking slot
+  // 9. If the team is now full, close the matchmaking slot
   if (newMembers.length + 1 >= team.max_team_size) {
     await supabase.from('teams').update({ looking_for_members: false }).eq('id', teamId)
   }
