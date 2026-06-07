@@ -254,6 +254,18 @@ export default function AdminPage() {
     }
   }
 
+  async function toggleEventStatus(id: string, currentStatus: string) {
+    showStatus(`event_${id}`, 'Updating status...', 'info')
+    const newStatus = currentStatus === 'completed' ? 'upcoming' : 'completed'
+    const { error } = await supabase.from('events').update({ status: newStatus }).eq('id', id)
+    if (error) {
+      showStatus(`event_${id}`, `Failed: ${error.message}`, 'error')
+    } else {
+      fetchEvents()
+      await logAudit('TOGGLE_EVENT_STATUS', { event_id: id, status: newStatus })
+    }
+  }
+
   // --- TEAM ---
   async function fetchTeam() {
     setLoadingTeam(true)
@@ -559,8 +571,11 @@ export default function AdminPage() {
                             
                             {userRole === 'admin' && (
                               <>
-                                <button onClick={() => toggleRegistration(evt.id, !!evt.registration_open)} className={`px-4 py-2 border rounded-lg text-[13px] font-semibold transition-colors ${evt.registration_open ? 'bg-orange-500/10 text-orange-400 border-orange-500/20 hover:bg-orange-500 hover:text-white' : 'bg-green-500/10 text-green-400 border-green-500/20 hover:bg-green-500 hover:text-white'}`}>
-                                  {evt.registration_open ? 'Close' : 'Open'}
+                                <button onClick={() => toggleEventStatus(evt.id, evt.status)} className={`px-4 py-2 border rounded-lg text-[13px] font-semibold transition-colors mr-2 ${evt.status === 'completed' ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20 hover:bg-yellow-500 hover:text-white' : 'bg-blue-500/10 text-blue-400 border-blue-500/20 hover:bg-blue-500 hover:text-white'}`}>
+                                  {evt.status === 'completed' ? 'Mark Upcoming' : 'Mark Completed'}
+                                </button>
+                                <button onClick={() => toggleRegistration(evt.id, !!evt.registration_open)} className={`px-4 py-2 border rounded-lg text-[13px] font-semibold transition-colors mr-2 ${evt.registration_open ? 'bg-orange-500/10 text-orange-400 border-orange-500/20 hover:bg-orange-500 hover:text-white' : 'bg-green-500/10 text-green-400 border-green-500/20 hover:bg-green-500 hover:text-white'}`}>
+                                  {evt.registration_open ? 'Close Reg' : 'Open Reg'}
                                 </button>
                                 <button onClick={() => deleteEvent(evt.id, evt.title)} className="px-4 py-2 bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500 hover:text-white rounded-lg text-[13px] font-semibold transition-colors">Delete</button>
                               </>
