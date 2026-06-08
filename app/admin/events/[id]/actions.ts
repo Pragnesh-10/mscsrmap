@@ -80,8 +80,181 @@ export async function updateRegistrationDetails(eventId: string, regId: string, 
   if (error) return { error: error.message }
 
   revalidatePath(`/admin/events/${eventId}`)
-  await logAudit('UPDATE_REGISTRATION', { event_id: eventId, reg_id: regId, lead_email: leadEmail })
+  await logAudit('UPDATE_REGISTRATION', { event_id: eventId, registration_id: regId })
   return { success: true }
+}
+
+export async function deleteRegistration(eventId: string, regId: string) {
+  const supabase = await createClient()
+
+  // Verify access
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) return { error: 'Unauthorized' }
+
+  const { data: profile } = await supabase
+    .from('member_profiles')
+    .select('role')
+    .eq('id', session.user.id)
+    .single()
+
+  if (!profile || (profile.role !== 'admin' && profile.role !== 'core_member')) {
+    return { error: 'Unauthorized' }
+  }
+
+  // Get hash_payload to delete from teams if applicable
+  const { data: regData } = await supabase
+    .from('registrations')
+    .select('hash_payload')
+    .eq('id', regId)
+    .single()
+
+  if (regData?.hash_payload) {
+    await supabase.from('teams').delete().eq('hash_payload', regData.hash_payload)
+  }
+
+  const { error } = await supabase
+    .from('registrations')
+    .delete()
+    .eq('id', regId)
+
+  if (error) return { error: error.message }
+
+  revalidatePath(`/admin/events/${eventId}`)
+  await logAudit('DELETE_REGISTRATION', { event_id: eventId, registration_id: regId })
+  return { success: true }
+}
+
+export async function importExternalRegistrations(eventId: string, rows: any[]) {
+  const supabase = await createClient()
+
+  // Verify access
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) return { error: 'Unauthorized' }
+
+  const { data: profile } = await supabase
+    .from('member_profiles')
+    .select('role')
+    .eq('id', session.user.id)
+    .single()
+
+  if (!profile || (profile.role !== 'admin' && profile.role !== 'core_member')) {
+    return { error: 'Unauthorized' }
+  }
+
+  // Create Admin Supabase Client for creating users
+  const { createClient: createSupabaseClient } = require('@supabase/supabase-js');
+  const supabaseAdmin = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  let successCount = 0;
+  let skipCount = 0;
+  let errors: string[] = [];
+
+  for (const row of rows) {
+    const email = row['Email Address'] || row['Email'] || row['email'];
+    const name = row['Name'] || row['Full Name'] || row['name'] || row['First Name'];
+    const teamName = row['Team Name'] || row['Team'] || row['team_name'];
+    const regNum = row['Registration Number'] || row['Registration No'] || row['Roll Number'] || row['reg_num'];
+    const collegeName = row['College Name'] || row['College'] || row['Institution Name'];
+    const year = row['Year of Study'] || row['Year'] || 'Unknown';
+
+    if (!email) {
+      skipCount++;
+      continue;
+    }
+
+    try {
+      // 1. Ensure user profile exists
+      const { data: existingUser } = await supabaseAdmin.from('member_profiles').select('id').eq('email', email).single();
+      
+      let userId = existingUser?.id;
+
+      if (!existingUser) {
+        // Create an auth user first
+        const randomPassword = require('crypto').randomUUID();
+        const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
+          email: email,
+          password: randomPassword,
+          email_confirm: true
+        });
+
+        if (authError || !authUser.user) {
+          errors.push(`Failed to create auth user for ${email}: ${authError?.message}`);
+          skipCount++;
+          continue;
+        }
+        
+        userId = authUser.user.id;
+
+        // Create profile
+        await supabaseAdmin.from('member_profiles').insert({
+          id: userId,
+          email: email,
+          full_name: name || email.split('@')[0],
+          role: 'user',
+          registration_number: regNum || null
+        });
+      }
+
+      // 2. Insert Registration
+      // We will create individual registrations for now, or if Team Name exists, group them? 
+      // Unstop usually provides one row per team OR one row per member. 
+      // If it's one row per team, Unstop will have "Member 1 Email", "Member 2 Email".
+      // Assuming a flattened structure for simplicity where we just make a Team Lead registration.
+      
+      // Let's check if a registration for this email already exists for this event
+      const { data: existingReg } = await supabaseAdmin.from('registrations')
+        .select('id')
+        .eq('event_id', eventId)
+        .eq('lead_email', email)
+        .single();
+        
+      if (existingReg) {
+        skipCount++;
+        continue; // Already registered
+      }
+
+      const formData = {
+        fullName: name || email.split('@')[0],
+        email: email,
+        regNum: regNum || undefined,
+        collegeName: collegeName || undefined,
+        year: year
+      };
+      
+      const teamData = teamName ? {
+        teamName: teamName,
+        leadIndex: 0,
+        members: [] // Not parsing complex nested members for now
+      } : null;
+
+      const { error: regError } = await supabaseAdmin.from('registrations').insert({
+        event_id: eventId,
+        lead_email: email,
+        form_data: formData,
+        team_data: teamData,
+        hash_payload: require('crypto').randomUUID()
+      });
+
+      if (regError) {
+        errors.push(`Failed to create registration for ${email}: ${regError.message}`);
+        skipCount++;
+      } else {
+        successCount++;
+      }
+
+    } catch (err: any) {
+      errors.push(`Exception for ${email}: ${err.message}`);
+      skipCount++;
+    }
+  }
+
+  await logAudit('IMPORT_CSV_REGISTRATIONS', { event_id: eventId, success_count: successCount, skip_count: skipCount });
+  revalidatePath(`/admin/events/${eventId}`);
+  
+  return { success: true, successCount, skipCount, errors };
 }
 
 export async function updateEventDetails(eventId: string, updateData: any) {
@@ -108,7 +281,7 @@ export async function updateEventDetails(eventId: string, updateData: any) {
 
   if (error) return { error: error.message }
 
-  revalidatePath('/admin')
+  revalidatePath('/admin', 'layout')
   revalidatePath('/events', 'layout')
   await logAudit('UPDATE_EVENT', { event_id: eventId, title: updateData.title })
   return { success: true }

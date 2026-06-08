@@ -127,12 +127,16 @@ export async function submitPublicRegistration(eventId: string, formData: any) {
     const leaderBranch = baseFormData.branch || ''
     const leaderYear = baseFormData.year || ''
 
+    const computedMaxTeamSize = formData.maxTeamSize ? Math.min(formData.maxTeamSize, eventData.form_requirements?.max_team_size || 4) : (eventData.form_requirements?.max_team_size || 4);
+    const initialMemberCount = 1 + (baseFormData.teamMembers ? baseFormData.teamMembers.length : 0);
+    const isActuallyLooking = !!formData.lookingForMembers && (initialMemberCount < computedMaxTeamSize);
+
     const { data: newTeam } = await supabase.from('teams').insert([{
       registration_id: insertedData.id,
       event_id: eventId,
       team_name: formData.teamName,
-      max_team_size: eventData.form_requirements?.max_team_size || 4,
-      looking_for_members: !!formData.lookingForMembers, // True if checked, false otherwise
+      max_team_size: computedMaxTeamSize,
+      looking_for_members: isActuallyLooking,
       leader_name: leaderFullName,
       leader_email: leaderEmail,
       leader_branch: leaderBranch,

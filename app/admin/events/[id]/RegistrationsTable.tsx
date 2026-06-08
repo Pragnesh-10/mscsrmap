@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, Fragment } from 'react'
-import { assignCertificates, updateRegistrationDetails } from './actions'
+import { assignCertificates, updateRegistrationDetails, deleteRegistration } from './actions'
 import IDCardModal from './IDCardModal'
 
 export default function RegistrationsTable({ registrations, eventTitle, eventId }: { registrations: any[], eventTitle: string, eventId: string }) {
@@ -14,6 +14,7 @@ export default function RegistrationsTable({ registrations, eventTitle, eventId 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState<any>(null)
   const [isSaving, setIsSaving] = useState(false)
+  const [isDeleting, setIsDeleting] = useState<string | null>(null)
   const [isIDModalOpen, setIsIDModalOpen] = useState(false)
 
   const toggleExpand = (id: string) => {
@@ -56,6 +57,16 @@ export default function RegistrationsTable({ registrations, eventTitle, eventId 
     await updateRegistrationDetails(eventId, regId, editForm.lead_email, editForm.form_data, editForm.team_data)
     setIsSaving(false)
     setEditingId(null)
+  }
+
+  const handleDelete = async (regId: string) => {
+    if (!confirm('Are you absolutely sure you want to delete this registration? This action cannot be undone.')) return;
+    setIsDeleting(regId)
+    const res = await deleteRegistration(eventId, regId)
+    if (res?.error) {
+      alert(`Error deleting registration: ${res.error}`)
+    }
+    setIsDeleting(null)
   }
 
   const exportToCSV = () => {
@@ -185,6 +196,7 @@ export default function RegistrationsTable({ registrations, eventTitle, eventId 
                 const teamSize = isTeam ? reg.team_data.members.length + 1 : 1
 
                 const certType = reg.form_data?.certificate_type || 'none'
+                const anyCheckedIn = reg.checked_in || (isTeam && reg.team_data.members.some((m: any) => m.checked_in))
                 
                 let certBadge = <span className="text-white/20 text-xs">-</span>
                 if (certType === 'winner') certBadge = <span className="px-2 py-1 bg-yellow-500/10 text-yellow-500 font-bold uppercase tracking-wider text-[10px] rounded-md border border-yellow-500/20"><i className="fas fa-trophy mr-1"></i> Winner</span>
@@ -202,20 +214,18 @@ export default function RegistrationsTable({ registrations, eventTitle, eventId 
                           className="w-4 h-4 accent-blue-500 rounded cursor-pointer"
                         />
                       </td>
-                      <td className="p-5 text-center text-white/40 cursor-pointer" onClick={() => isTeam && toggleExpand(reg.id)}>
-                        {isTeam && (
-                          <i className={`fas fa-chevron-${isExpanded ? 'up text-blue-400' : 'down'} transition-all`}></i>
-                        )}
+                      <td className="p-5 text-center text-white/40 cursor-pointer" onClick={() => toggleExpand(reg.id)}>
+                        <i className={`fas fa-chevron-${isExpanded ? 'up text-blue-400' : 'down'} transition-all`}></i>
                       </td>
-                      <td className="p-5 font-medium cursor-pointer" onClick={() => isTeam && toggleExpand(reg.id)}>{reg.lead_email}</td>
-                      <td className="p-5 cursor-pointer" onClick={() => isTeam && toggleExpand(reg.id)}>
+                      <td className="p-5 font-medium cursor-pointer" onClick={() => toggleExpand(reg.id)}>{reg.lead_email}</td>
+                      <td className="p-5 cursor-pointer" onClick={() => toggleExpand(reg.id)}>
                         {reg.team_data?.teamName ? (
                           <span className="px-3 py-1 bg-purple-500/10 text-purple-400 font-bold uppercase tracking-wider text-[10px] rounded-full border border-purple-500/20">
                             {reg.team_data.teamName} <span className="ml-1 text-white/40">({teamSize})</span>
                           </span>
                         ) : <span className="text-white/40 text-xs">Individual</span>}
                       </td>
-                      <td className="p-5 text-center">{certBadge}</td>
+                      <td className="p-5 text-center">{anyCheckedIn ? certBadge : <span className="text-white/20 text-xs">-</span>}</td>
                       <td className="p-5 text-center">
                         {reg.checked_in ? (
                           <span className="text-green-400 bg-green-500/10 px-2 py-1 rounded-md text-xs font-bold border border-green-500/20"><i className="fas fa-check-circle mr-1"></i> Checked In</span>
@@ -226,19 +236,26 @@ export default function RegistrationsTable({ registrations, eventTitle, eventId 
                       <td className="p-5 text-right text-sm text-white/50">{new Date(reg.created_at).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}</td>
                     </tr>
                     
-                    {isExpanded && isTeam && (
+                    {isExpanded && (
                       <tr className="bg-black/20 border-b border-blue-500/20">
                         <td colSpan={8} className="p-0">
                           <div className="p-6 md:p-8 animate-in slide-in-from-top-2 duration-200">
                             <div className="flex justify-between items-center mb-4">
-                              <h4 className="text-xs font-bold text-blue-400 uppercase tracking-widest">Detailed Roster</h4>
+                              <h4 className="text-xs font-bold text-blue-400 uppercase tracking-widest">{isTeam ? 'Detailed Roster' : 'Registration Details'}</h4>
                               {editingId === reg.id ? (
                                 <div className="flex gap-2">
-                                  <button onClick={() => setEditingId(null)} className="px-3 py-1 bg-white/10 hover:bg-white/20 rounded-md text-[10px] font-bold text-white transition-colors">Cancel</button>
+                                  <button onClick={() => setEditingId(null)} className="px-3 py-1 bg-white/5 hover:bg-white/10 text-white/60 border border-white/10 rounded-md text-[10px] font-bold transition-colors">Cancel</button>
                                   <button onClick={() => saveEditing(reg.id)} disabled={isSaving} className="px-3 py-1 bg-green-500/20 hover:bg-green-500/30 text-green-400 border border-green-500/30 rounded-md text-[10px] font-bold transition-colors">{isSaving ? 'Saving...' : 'Save Changes'}</button>
                                 </div>
                               ) : (
-                                <button onClick={() => startEditing(reg)} className="px-3 py-1 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 rounded-md text-[10px] font-bold transition-colors"><i className="fas fa-edit mr-1"></i> Edit Details</button>
+                                <div className="flex gap-2">
+                                  <button onClick={() => handleDelete(reg.id)} disabled={isDeleting === reg.id} className="px-3 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-md text-[10px] font-bold transition-colors">
+                                    {isDeleting === reg.id ? <i className="fas fa-spinner fa-spin mr-1"></i> : <i className="fas fa-trash mr-1"></i>} Delete
+                                  </button>
+                                  <button onClick={() => startEditing(reg)} className="px-3 py-1 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 rounded-md text-[10px] font-bold transition-colors">
+                                    <i className="fas fa-edit mr-1"></i> Edit Details
+                                  </button>
+                                </div>
                               )}
                             </div>
                             

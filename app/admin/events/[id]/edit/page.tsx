@@ -32,7 +32,7 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
 
   return (
     <div className="flex h-screen bg-[#09090b] text-[#f4f4f5] font-sans overflow-hidden">
-      <main className="flex-1 overflow-y-auto p-10 relative">
+      <main className="flex-1 overflow-y-auto p-4 md:p-10 relative">
         <div className="absolute top-[-100px] right-[-100px] w-[400px] h-[400px] rounded-full bg-blue-500/15 blur-[100px] z-0 pointer-events-none"></div>
         
         <div className="relative z-10 max-w-6xl mx-auto">

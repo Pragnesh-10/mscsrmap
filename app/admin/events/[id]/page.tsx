@@ -2,6 +2,7 @@ import { createClient } from '@/utils/supabase/server'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import RegistrationsTable from './RegistrationsTable'
+import CSVImportBlock from './CSVImportBlock'
 
 export const dynamic = 'force-dynamic'
 
@@ -40,7 +41,7 @@ export default async function AdminEventViewer({ params }: { params: Promise<{ i
 
   return (
     <div className="flex h-screen bg-[#09090b] text-[#f4f4f5] font-sans overflow-hidden">
-      <main className="flex-1 overflow-y-auto p-10 relative">
+      <main className="flex-1 overflow-y-auto p-4 md:p-10 relative">
         <div className="absolute top-[-100px] right-[-100px] w-[400px] h-[400px] rounded-full bg-blue-500/15 blur-[100px] z-0 pointer-events-none"></div>
         
         <div className="relative z-10 max-w-6xl mx-auto">
@@ -52,7 +53,7 @@ export default async function AdminEventViewer({ params }: { params: Promise<{ i
             <div>
               <h1 className="text-3xl font-bold text-white mb-2">{event.title}</h1>
               <p className="text-white/40 text-sm">
-                <i className="fas fa-calendar-alt mr-2 text-blue-400"></i> {new Date(event.date_start).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
+                <i className="fas fa-calendar-alt mr-2 text-blue-400"></i> {new Date(event.date_start).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium' })}
               </p>
             </div>
             <div className="text-right">
@@ -74,6 +75,8 @@ export default async function AdminEventViewer({ params }: { params: Promise<{ i
               </Link>
             )}
           </div>
+
+          <CSVImportBlock eventId={id} />
 
           <RegistrationsTable registrations={registrations || []} eventTitle={event.title} eventId={id} />
         </div>

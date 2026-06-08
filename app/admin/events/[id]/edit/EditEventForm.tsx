@@ -9,6 +9,7 @@ import Link from 'next/link'
 export default function EditEventForm({ event }: { event: any }) {
   const router = useRouter()
   const [allowTeamsToggle, setAllowTeamsToggle] = useState(event.form_requirements?.allow_teams || false)
+  const [existingGallery, setExistingGallery] = useState<string[]>(event.gallery_urls || [])
   const [statusMsg, setStatusMsg] = useState<{ id: string, msg: string, type: 'error' | 'success' | 'info' } | null>(null)
   const supabase = createClient()
 
@@ -42,6 +43,7 @@ export default function EditEventForm({ event }: { event: any }) {
     const imageFile = formData.get('image') as File
     const certificateHtml = formData.get('certificate_html') as string
     const registration_open = formData.get('registration_open') === 'on'
+    const galleryFiles = formData.getAll('gallery') as File[]
 
     const form_requirements: Record<string, any> = {
       req_reg_num: formData.get('req_reg_num') === 'on',
@@ -69,8 +71,23 @@ export default function EditEventForm({ event }: { event: any }) {
     const maxCapStr = formData.get('max_capacity') as string
     const max_capacity = maxCapStr ? parseInt(maxCapStr) : null
 
+    // Upload new gallery images
+    const newGalleryUrls: string[] = []
+    for (const file of galleryFiles) {
+      if (file && file.size > 0) {
+        try {
+          const url = await uploadImage(file, 'gallery')
+          newGalleryUrls.push(url)
+        } catch (err: any) {
+          showStatus('edit_event', `Gallery Upload Failed: ${err.message}`, 'error')
+          return
+        }
+      }
+    }
+    const finalGallery = [...existingGallery, ...newGalleryUrls]
+
     const updateData = {
-      title, date_start, status, location, description, image_url, registration_open, form_requirements, certificate_html: certificateHtml, max_capacity 
+      title, date_start, status, location, description, image_url, registration_open, form_requirements, certificate_html: certificateHtml, max_capacity, gallery_urls: finalGallery 
     }
 
     const res = await updateEventDetails(event.id, updateData)
@@ -85,8 +102,12 @@ export default function EditEventForm({ event }: { event: any }) {
     }
   }
 
-  // Format date for datetime-local input (YYYY-MM-DDThh:mm)
-  const defaultDate = event.date_start ? new Date(event.date_start).toISOString().slice(0, 16) : ''
+  // Format date for date input (YYYY-MM-DD) in local timezone
+  function toLocalDatetimeString(dateObj: Date) {
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    return `${dateObj.getFullYear()}-${pad(dateObj.getMonth() + 1)}-${pad(dateObj.getDate())}`;
+  }
+  const defaultDate = event.date_start ? toLocalDatetimeString(new Date(event.date_start)) : ''
 
   return (
     <div className="bg-[#18181b]/60 backdrop-blur-xl border border-white/10 rounded-[20px] p-8 mb-8 shadow-2xl">
@@ -97,8 +118,8 @@ export default function EditEventForm({ event }: { event: any }) {
             <input type="text" name="title" required defaultValue={event.title} className="p-3 bg-black/40 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500" />
           </div>
           <div className="flex flex-col gap-2">
-            <label className="text-[13px] font-semibold text-[#a1a1aa] uppercase tracking-wider">Date & Time</label>
-            <input type="datetime-local" name="date_start" required defaultValue={defaultDate} className="p-3 bg-black/40 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500" />
+            <label className="text-[13px] font-semibold text-[#a1a1aa] uppercase tracking-wider">Date</label>
+            <input type="date" name="date_start" required defaultValue={defaultDate} className="p-3 bg-black/40 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500" />
           </div>
           <div className="flex flex-col gap-2">
             <label className="text-[13px] font-semibold text-[#a1a1aa] uppercase tracking-wider">Status</label>
@@ -151,6 +172,33 @@ export default function EditEventForm({ event }: { event: any }) {
             defaultValue={event.certificate_html || ''}
             className="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-white font-mono text-xs focus:outline-none focus:border-yellow-500"
           ></textarea>
+        </div>
+
+        {/* Gallery Upload Section */}
+        <div className="flex flex-col gap-4 mt-2 p-5 bg-black/30 border border-white/5 rounded-xl">
+          <div className="flex justify-between items-end">
+            <label className="text-[13px] font-bold text-[#a1a1aa] uppercase tracking-wider">Event Photo Gallery</label>
+            <span className="text-[10px] text-white/40 normal-case font-normal">Upload photos from the event (especially useful after completion).</span>
+          </div>
+          
+          {existingGallery.length > 0 && (
+            <div className="grid grid-cols-3 md:grid-cols-5 gap-4 mb-2">
+              {existingGallery.map((url, i) => (
+                <div key={i} className="relative group rounded-xl overflow-hidden aspect-square">
+                  <img src={url} alt={`Gallery ${i}`} className="w-full h-full object-cover" />
+                  <button 
+                    type="button" 
+                    onClick={() => setExistingGallery(prev => prev.filter((_, index) => index !== i))}
+                    className="absolute inset-0 bg-red-500/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white text-xs font-bold"
+                  >
+                    <i className="fas fa-trash-alt mr-2"></i> Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <input type="file" name="gallery" accept="image/*" multiple className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-blue-500/20 file:text-blue-400 hover:file:bg-blue-500/30 transition-all cursor-pointer" />
         </div>
 
         {/* Form Builder Section */}

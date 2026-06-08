@@ -106,7 +106,7 @@ export default async function EventPage(props: {
               <div className="flex flex-wrap gap-6 text-sm text-white/50 bg-black/20 p-5 rounded-2xl border border-white/5 inline-flex">
                 <div className="flex items-center gap-2">
                   <i className="fas fa-calendar-alt text-blue-400"></i>
-                  <span>{new Date(evt.date_start).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</span>
+                  <span>{new Date(evt.date_start).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium' })}</span>
                 </div>
                 {evt.location && (
                   <div className="flex items-center gap-2">
@@ -117,6 +117,23 @@ export default async function EventPage(props: {
               </div>
             </div>
           </div>
+
+          {/* Event Photo Gallery */}
+          {evt.gallery_urls && Array.isArray(evt.gallery_urls) && evt.gallery_urls.length > 0 && (
+            <div className="mb-8 bg-[#18181b]/40 backdrop-blur-md p-6 md:p-8 rounded-[20px] border border-white/5 shadow-xl">
+              <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+                <i className="fas fa-camera-retro text-blue-400"></i> Event Gallery
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {evt.gallery_urls.map((url: string, idx: number) => (
+                  <div key={idx} className="relative aspect-video rounded-xl overflow-hidden group">
+                    <img src={url} alt={`${evt.title} photo ${idx + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-500"></div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <EventPortalTabs event={evt} isWaitlistMode={isWaitlistMode} openTeams={openTeams} invitedTeam={invitedTeam} />
         </div>

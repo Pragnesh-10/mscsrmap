@@ -24,6 +24,10 @@ export default function EventPortalTabs({ event, isWaitlistMode = false, openTea
   const [lookupLoading, setLookupLoading] = useState(false)
   const [lookupError, setLookupError] = useState<string | null>(null)
   
+  // Certificate Security States
+  const [unlockedCerts, setUnlockedCerts] = useState<Record<string, boolean>>({})
+  const [certInputs, setCertInputs] = useState<Record<string, string>>({})
+  
   // Matchmaking State
   const [selectedJoinTeam, setSelectedJoinTeam] = useState<any>(null)
   const [joinLoading, setJoinLoading] = useState(false)
@@ -79,6 +83,9 @@ export default function EventPortalTabs({ event, isWaitlistMode = false, openTea
     for (let i = 1; i < teamSize; i++) {
       const memberEmail = formData.get(`member_${i}_email`)?.toString() || ''
       
+      // If email is empty, it means they want an empty slot (e.g. for matchmaking)
+      if (!memberEmail.trim()) continue;
+
       if (isInternal && !memberEmail.toLowerCase().endsWith('@srmap.edu.in')) {
         setErrorMsg(`Member ${i + 1} must use an @srmap.edu.in email address.`)
         setLoading(false)
@@ -104,6 +111,7 @@ export default function EventPortalTabs({ event, isWaitlistMode = false, openTea
     if (isCreatingTeam) {
       baseData.teamName = formData.get('teamName')
       baseData.lookingForMembers = formData.get('lookingForMembers') === 'on'
+      baseData.maxTeamSize = teamSize
     }
 
     const res = await submitPublicRegistration(event.id, baseData)
@@ -183,15 +191,15 @@ export default function EventPortalTabs({ event, isWaitlistMode = false, openTea
     }
   }
 
-  async function downloadCertificate() {
-    const certEl = document.getElementById('certificate-node')
+  async function downloadCertificate(memberId: string, memberName: string) {
+    const certEl = document.getElementById(`certificate-node-${memberId}`)
     if (!certEl) return;
     try {
       // @ts-ignore
       const domtoimage = (await import('dom-to-image-more')).default
       const dataUrl = await domtoimage.toPng(certEl, { bgcolor: '#0a0a0b', scale: 2 })
       const link = document.createElement('a')
-      link.download = `${event.title}-Certificate.png`
+      link.download = `${memberName.replace(/[^a-zA-Z0-9]/g, '_')}-Certificate.png`
       link.href = dataUrl
       link.click()
     } catch (err) {
@@ -206,6 +214,50 @@ export default function EventPortalTabs({ event, isWaitlistMode = false, openTea
   const isParticipation = certType === 'participation'
   const hasCertificate = isWinner || isRunnerUp || isParticipation
   const customTemplateUrl = event.form_requirements?.certificate_template_url
+
+  const eligibleMembers: { id: string; name: string; regNum?: string; email?: string }[] = [];
+  if (currentReg && hasCertificate) {
+    if (currentReg.checked_in) {
+      eligibleMembers.push({ 
+        id: 'primary', 
+        name: currentReg.form_data?.fullName || currentReg.lead_email,
+        regNum: currentReg.form_data?.regNum,
+        email: currentReg.lead_email
+      });
+    }
+    if (currentReg.team_data && currentReg.team_data.members) {
+      currentReg.team_data.members.forEach((m: any, i: number) => {
+        if (m.checked_in) {
+          eligibleMembers.push({ 
+            id: `member-${i}`, 
+            name: m.fullName || m.email,
+            regNum: m.regNum,
+            email: m.email
+          });
+        }
+      });
+    }
+  }
+
+  const handleUnlockCert = (memberId: string, expectedRegNum: string | undefined, expectedEmail: string | undefined) => {
+    const input = (certInputs[memberId] || '').trim().toLowerCase();
+    
+    if (expectedRegNum) {
+      if (input === expectedRegNum.trim().toLowerCase()) {
+        setUnlockedCerts(prev => ({...prev, [memberId]: true}));
+      } else {
+        alert("Incorrect Registration Number. Please check and try again.");
+      }
+    } else if (expectedEmail) {
+      if (input === expectedEmail.trim().toLowerCase()) {
+        setUnlockedCerts(prev => ({...prev, [memberId]: true}));
+      } else {
+        alert("Incorrect Email Address. Please check and try again.");
+      }
+    } else {
+      setUnlockedCerts(prev => ({...prev, [memberId]: true}));
+    }
+  };
 
   return (
     <>
@@ -411,11 +463,11 @@ export default function EventPortalTabs({ event, isWaitlistMode = false, openTea
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="flex flex-col gap-2">
                                   <label className="text-[12px] font-semibold text-[#a1a1aa] uppercase tracking-wider">Name</label>
-                                  <input type="text" name={`member_${num}_name`} required placeholder={`Member ${num + 1} Name`} className="p-2 bg-black/40 border border-white/10 rounded-lg text-white focus:outline-none focus:border-blue-500" />
+                                  <input type="text" name={`member_${num}_name`} placeholder={`Member ${num + 1} Name`} className="p-2 bg-black/40 border border-white/10 rounded-lg text-white focus:outline-none focus:border-blue-500" />
                                 </div>
                                 <div className="flex flex-col gap-2">
-                                  <label className="text-[12px] font-semibold text-[#a1a1aa] uppercase tracking-wider">Email</label>
-                                  <input type="email" name={`member_${num}_email`} required placeholder={`member${num+1}@example.com`} className="p-2 bg-black/40 border border-white/10 rounded-lg text-white focus:outline-none focus:border-blue-500" />
+                                  <label className="text-[12px] font-semibold text-[#a1a1aa] uppercase tracking-wider">Email (Leave blank for an empty slot)</label>
+                                  <input type="email" name={`member_${num}_email`} placeholder={`member${num+1}@example.com`} className="p-2 bg-black/40 border border-white/10 rounded-lg text-white focus:outline-none focus:border-blue-500" />
                                 </div>
                               </div>
                               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -424,26 +476,26 @@ export default function EventPortalTabs({ event, isWaitlistMode = false, openTea
                                     {reqs.req_reg_num && (
                                       <div className="flex flex-col gap-2">
                                         <label className="text-[12px] font-semibold text-[#a1a1aa] uppercase tracking-wider">Reg No.</label>
-                                        <input type="text" name={`member_${num}_regNum`} required placeholder="Reg Number" className="p-2 bg-black/40 border border-white/10 rounded-lg text-white focus:outline-none focus:border-blue-500" />
+                                        <input type="text" name={`member_${num}_regNum`} placeholder="Reg Number" className="p-2 bg-black/40 border border-white/10 rounded-lg text-white focus:outline-none focus:border-blue-500" />
                                       </div>
                                     )}
                                     {reqs.req_branch && (
                                       <div className="flex flex-col gap-2">
                                         <label className="text-[12px] font-semibold text-[#a1a1aa] uppercase tracking-wider">Branch</label>
-                                        <input type="text" name={`member_${num}_branch`} required placeholder="Branch" className="p-2 bg-black/40 border border-white/10 rounded-lg text-white focus:outline-none focus:border-blue-500" />
+                                        <input type="text" name={`member_${num}_branch`} placeholder="Branch" className="p-2 bg-black/40 border border-white/10 rounded-lg text-white focus:outline-none focus:border-blue-500" />
                                       </div>
                                     )}
                                     {reqs.req_spec && (
                                       <div className="flex flex-col gap-2">
                                         <label className="text-[12px] font-semibold text-[#a1a1aa] uppercase tracking-wider">Specialization</label>
-                                        <input type="text" name={`member_${num}_spec`} required placeholder="Spec" className="p-2 bg-black/40 border border-white/10 rounded-lg text-white focus:outline-none focus:border-blue-500" />
+                                        <input type="text" name={`member_${num}_spec`} placeholder="Spec" className="p-2 bg-black/40 border border-white/10 rounded-lg text-white focus:outline-none focus:border-blue-500" />
                                       </div>
                                     )}
                                   </>
                                 )}
                                 <div className="flex flex-col gap-2">
                                   <label className="text-[12px] font-semibold text-[#a1a1aa] uppercase tracking-wider">Year</label>
-                                  <input type="text" name={`member_${num}_year`} required placeholder="Year" className="p-2 bg-black/40 border border-white/10 rounded-lg text-white focus:outline-none focus:border-blue-500" />
+                                  <input type="text" name={`member_${num}_year`} placeholder="Year" className="p-2 bg-black/40 border border-white/10 rounded-lg text-white focus:outline-none focus:border-blue-500" />
                                 </div>
                               </div>
                             </div>
@@ -583,78 +635,135 @@ export default function EventPortalTabs({ event, isWaitlistMode = false, openTea
                       : 'Certificates will be unlocked here after the event concludes and attendance is verified.'}
                   </p>
                 </div>
+              ) : eligibleMembers.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <div className="w-24 h-24 bg-red-500/10 rounded-full flex items-center justify-center mb-6 border border-red-500/20">
+                    <i className="fas fa-user-times text-4xl text-red-500/50"></i>
+                  </div>
+                  <h2 className="text-2xl font-bold text-red-400 mb-4">No Attendance Recorded</h2>
+                  <p className="text-red-400/60 text-center max-w-md">
+                    Certificates are only issued to members who have officially checked in at the venue. If you believe this is an error, please contact the administration.
+                  </p>
+                </div>
               ) : (
-                <div className="flex flex-col items-center">
-                  <div className="mb-8 border-b border-white/5 pb-6 w-full">
-                    <h2 className="text-2xl font-bold text-white mb-2">Your E-Certificate</h2>
-                    <p className="text-white/40 text-sm">Congratulations! You can download your official certificate below.</p>
+                <div className="flex flex-col items-center w-full">
+                  <div className="mb-8 border-b border-white/5 pb-6 w-full text-center">
+                    <h2 className="text-2xl font-bold text-white mb-2">Your E-Certificates</h2>
+                    <p className="text-white/40 text-sm">Download official certificates for all checked-in members below.</p>
                   </div>
 
-                  {/* Certificate Node for html2canvas */}
-                  {reqs.certificate_html ? (
-                    <div 
-                      id="certificate-node" 
-                      className="w-full max-w-3xl aspect-[1.414/1] relative shadow-2xl mb-8 overflow-hidden bg-white"
-                      dangerouslySetInnerHTML={{ 
-                        __html: reqs.certificate_html
-                          .replace(/\{\{NAME\}\}/g, currentReg.team_data?.teamName || currentReg.form_data?.fullName || '')
-                          .replace(/\{\{EVENT_TITLE\}\}/g, event.title || '')
-                          .replace(/\{\{EVENT_DATE\}\}/g, new Date(event.date_start).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }))
-                          .replace(/\{\{COLLEGE_NAME\}\}/g, currentReg.form_data?.collegeName || 'SRMAP')
-                      }}
-                    />
-                  ) : (
-                    <div id="certificate-node" className="relative w-full max-w-3xl aspect-[1.414/1] bg-[#0a0a0b] overflow-hidden border-8 border-double p-12 flex flex-col items-center text-center shadow-2xl mb-8"
-                    style={{
-                      borderColor: isWinner ? '#eab308' : isRunnerUp ? '#9ca3af' : '#3b82f6',
-                      background: customTemplateUrl ? `url(${customTemplateUrl})` : 
-                                  (isWinner ? 'radial-gradient(circle at center, #422006 0%, #0a0a0b 100%)' :
-                                  isRunnerUp ? 'radial-gradient(circle at center, #1f2937 0%, #0a0a0b 100%)' :
-                                  'radial-gradient(circle at center, #172554 0%, #0a0a0b 100%)'),
-                      backgroundSize: 'cover',
-                      backgroundPosition: 'center',
-                      textShadow: customTemplateUrl ? '0 2px 10px rgba(0,0,0,0.8)' : 'none'
-                    }}
-                  >
-                    {/* Watermark Logo/Icon - hide if custom template to prevent clashing */}
-                    {!customTemplateUrl && (
-                      <i className={`fas absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[300px] opacity-5 pointer-events-none ${
-                        isWinner ? 'fa-trophy text-yellow-500' : isRunnerUp ? 'fa-medal text-gray-400' : 'fa-award text-blue-500'
-                      }`}></i>
-                    )}
+                  {eligibleMembers.map((member) => {
+                    const isUnlocked = unlockedCerts[member.id];
+                    const authHint = member.regNum ? "Registration Number" : "Email Address";
+                    const authPlaceholder = member.regNum ? "e.g. AP2111001XXXX" : "name@example.com";
 
-                    <div className="relative z-10 flex flex-col items-center w-full h-full">
-                      <h4 className="text-sm font-black tracking-[0.3em] uppercase text-white/80 mb-12 drop-shadow-md">Official Certificate</h4>
-                      
-                      <h1 className={`text-5xl md:text-6xl font-black uppercase mb-4 tracking-wider drop-shadow-lg ${
-                        isWinner ? 'text-yellow-400' : isRunnerUp ? 'text-gray-200' : 'text-blue-300'
-                      }`}>
-                        {isWinner ? 'Winner' : isRunnerUp ? 'Runner-Up' : 'Participation'}
-                      </h1>
-                      
-                      <p className="text-white/80 text-lg mb-8 font-light italic drop-shadow-md">This is proudly presented to</p>
-                      
-                      <h2 className="text-4xl font-bold text-white mb-8 border-b border-white/30 pb-4 inline-block px-12 drop-shadow-xl">
-                        {currentReg.team_data?.teamName ? currentReg.team_data.teamName : currentReg.form_data?.fullName}
-                      </h2>
-                      
-                      <p className="text-white/80 text-lg mb-4 font-light italic drop-shadow-md">for their outstanding participation and achievement in</p>
-                      <h3 className="text-2xl font-bold text-white mb-auto drop-shadow-lg">{event.title}</h3>
-                      
-                      <div className="w-full flex justify-between items-end mt-12 border-t border-white/30 pt-8 drop-shadow-md">
-                        <div className="flex flex-col items-center w-48">
-                          <div className="h-px w-full bg-white/60 mb-2"></div>
-                          <span className="text-xs text-white/80 uppercase tracking-widest font-bold">Event Date</span>
-                          <span className="text-sm text-white/90 mt-1 font-semibold">{new Date(event.date_start).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}</span>
-                        </div>
+                    return (
+                    <div key={member.id} className="w-full flex flex-col items-center mb-16 pb-12 border-b border-white/5 last:border-0">
+                      <div className="flex items-center justify-between w-full max-w-3xl mb-4 px-4">
+                        <span className="text-lg font-bold text-blue-400">{member.name}</span>
+                        <span className="text-xs font-bold text-green-500 bg-green-500/10 px-3 py-1 rounded-full border border-green-500/20">Checked In</span>
                       </div>
-                    </div>
-                  </div>
-                  )}
+                      
+                      {!isUnlocked ? (
+                        <div className="w-full max-w-xl bg-white/5 border border-white/10 rounded-2xl p-8 flex flex-col items-center text-center mt-4">
+                          <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center mb-4 text-blue-400">
+                            <i className="fas fa-shield-alt text-2xl"></i>
+                          </div>
+                          <h3 className="text-xl font-bold text-white mb-2">Verify Identity</h3>
+                          <p className="text-white/60 text-sm mb-6">
+                            To ensure privacy, please enter <strong>{member.name.split(' ')[0]}'s</strong> {authHint} to unlock this certificate.
+                          </p>
+                          <div className="flex w-full gap-3">
+                            <input 
+                              type="text" 
+                              placeholder={authPlaceholder}
+                              value={certInputs[member.id] || ''}
+                              onChange={(e) => setCertInputs(prev => ({...prev, [member.id]: e.target.value}))}
+                              className="flex-1 p-3 bg-black/40 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500"
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleUnlockCert(member.id, member.regNum, member.email);
+                              }}
+                            />
+                            <button 
+                              onClick={() => handleUnlockCert(member.id, member.regNum, member.email)}
+                              className="px-6 py-3 bg-blue-500 hover:bg-blue-600 rounded-xl font-bold text-white transition-colors"
+                            >
+                              Unlock
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          {/* Certificate Node for html2canvas */}
+                          {reqs.certificate_html ? (
+                            <div 
+                              id={`certificate-node-${member.id}`} 
+                              className="w-full max-w-3xl aspect-[1.414/1] relative shadow-2xl mb-6 overflow-hidden bg-white"
+                              dangerouslySetInnerHTML={{ 
+                                __html: reqs.certificate_html
+                                  .replace(/\{\{NAME\}\}/g, member.name)
+                                  .replace(/\{\{EVENT_TITLE\}\}/g, event.title || '')
+                                  .replace(/\{\{EVENT_DATE\}\}/g, new Date(event.date_start).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }))
+                                  .replace(/\{\{COLLEGE_NAME\}\}/g, currentReg.form_data?.collegeName || 'SRMAP')
+                              }}
+                            />
+                          ) : (
+                            <div id={`certificate-node-${member.id}`} className="relative w-full max-w-3xl aspect-[1.414/1] bg-[#0a0a0b] overflow-hidden border-8 border-double p-12 flex flex-col items-center text-center shadow-2xl mb-6"
+                            style={{
+                              borderColor: isWinner ? '#eab308' : isRunnerUp ? '#9ca3af' : '#3b82f6',
+                              background: customTemplateUrl ? `url(${customTemplateUrl})` : 
+                                          (isWinner ? 'radial-gradient(circle at center, #422006 0%, #0a0a0b 100%)' :
+                                          isRunnerUp ? 'radial-gradient(circle at center, #1f2937 0%, #0a0a0b 100%)' :
+                                          'radial-gradient(circle at center, #172554 0%, #0a0a0b 100%)'),
+                              backgroundSize: 'cover',
+                              backgroundPosition: 'center',
+                              textShadow: customTemplateUrl ? '0 2px 10px rgba(0,0,0,0.8)' : 'none'
+                            }}
+                          >
+                            {/* Watermark Logo/Icon - hide if custom template to prevent clashing */}
+                            {!customTemplateUrl && (
+                              <i className={`fas absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[300px] opacity-5 pointer-events-none ${
+                                isWinner ? 'fa-trophy text-yellow-500' : isRunnerUp ? 'fa-medal text-gray-400' : 'fa-award text-blue-500'
+                              }`}></i>
+                            )}
 
-                  <button onClick={downloadCertificate} className="px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 rounded-xl font-bold transition-all shadow-[0_10px_30px_rgba(59,130,246,0.3)] text-white flex items-center gap-3">
-                    <i className="fas fa-download text-xl"></i> Download High-Res Certificate
-                  </button>
+                            <div className="relative z-10 flex flex-col items-center w-full h-full">
+                              <h4 className="text-sm font-black tracking-[0.3em] uppercase text-white/80 mb-12 drop-shadow-md">Official Certificate</h4>
+                              
+                              <h1 className={`text-5xl md:text-6xl font-black uppercase mb-4 tracking-wider drop-shadow-lg ${
+                                isWinner ? 'text-yellow-400' : isRunnerUp ? 'text-gray-200' : 'text-blue-300'
+                              }`}>
+                                {isWinner ? 'Winner' : isRunnerUp ? 'Runner-Up' : 'Participation'}
+                              </h1>
+                              
+                              <p className="text-white/80 text-lg mb-8 font-light italic drop-shadow-md">This is proudly presented to</p>
+                              
+                              <h2 className="text-4xl font-bold text-white mb-8 border-b border-white/30 pb-4 inline-block px-12 drop-shadow-xl">
+                                {member.name}
+                              </h2>
+                              
+                              <p className="text-white/80 text-lg mb-4 font-light italic drop-shadow-md">for their outstanding participation and achievement in</p>
+                              <h3 className="text-2xl font-bold text-white mb-auto drop-shadow-lg">{event.title}</h3>
+                              
+                              <div className="w-full flex justify-between items-end mt-12 border-t border-white/30 pt-8 drop-shadow-md">
+                                <div className="flex flex-col items-center w-48">
+                                  <div className="h-px w-full bg-white/60 mb-2"></div>
+                                  <span className="text-xs text-white/80 uppercase tracking-widest font-bold">Event Date</span>
+                                  <span className="text-sm text-white/90 mt-1 font-semibold">{new Date(event.date_start).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          )}
+
+                          <button onClick={() => downloadCertificate(member.id, member.name)} className="px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 rounded-xl font-bold transition-all shadow-[0_10px_30px_rgba(59,130,246,0.3)] text-white flex items-center gap-3">
+                            <i className="fas fa-download text-xl"></i> Download {member.name.split(' ')[0]}'s Certificate
+                          </button>
+                        </>
+                      )}
+                    </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -695,9 +804,12 @@ export default function EventPortalTabs({ event, isWaitlistMode = false, openTea
                 
                 <div className="ml-6 flex-1 flex flex-col items-end text-right">
                   <p className="text-[10px] uppercase tracking-widest text-white/40 mb-1">Primary Registrant</p>
-                  <p className="text-sm font-bold text-white mb-3">
-                    {currentReg?.form_data?.fullName || currentReg?.lead_email || 'N/A'}
-                  </p>
+                  <div className="flex items-center gap-2 mb-3 justify-end">
+                    {currentReg?.checked_in && <span className="text-green-500 text-xs"><i className="fas fa-check-circle"></i></span>}
+                    <p className="text-sm font-bold text-white">
+                      {currentReg?.form_data?.fullName || currentReg?.lead_email || 'N/A'}
+                    </p>
+                  </div>
                   
                   {currentReg?.team_data?.teamName && (
                     <>
@@ -713,14 +825,20 @@ export default function EventPortalTabs({ event, isWaitlistMode = false, openTea
                   <p className="text-[10px] uppercase tracking-widest text-white/40 mb-2 border-b border-white/5 pb-2">Team Members</p>
                   <div className="flex flex-col gap-1">
                     {currentReg.team_data.members.map((m: any, idx: number) => (
-                      <p key={idx} className="text-xs text-white/80 flex justify-between">
-                        <span>{m.fullName || m.email}</span>
+                      <p key={idx} className="text-xs text-white/80 flex justify-between items-center">
+                        <span className="flex items-center gap-2">
+                          {m.checked_in ? <i className="fas fa-check-circle text-green-500"></i> : <i className="fas fa-clock text-white/20"></i>}
+                          {m.fullName || m.email}
+                        </span>
                         {currentReg.team_data.leadIndex === idx + 1 && <span className="text-purple-400 text-[10px] font-bold">LEAD</span>}
                       </p>
                     ))}
                     {currentReg.team_data.leadIndex === 0 && (
-                      <p className="text-xs text-white/80 flex justify-between">
-                        <span>{currentReg.form_data?.fullName || currentReg.lead_email}</span>
+                      <p className="text-xs text-white/80 flex justify-between items-center">
+                        <span className="flex items-center gap-2">
+                          {currentReg.checked_in ? <i className="fas fa-check-circle text-green-500"></i> : <i className="fas fa-clock text-white/20"></i>}
+                          {currentReg.form_data?.fullName || currentReg.lead_email}
+                        </span>
                         <span className="text-purple-400 text-[10px] font-bold">LEAD</span>
                       </p>
                     )}
@@ -780,8 +898,8 @@ export default function EventPortalTabs({ event, isWaitlistMode = false, openTea
               {reqs.req_branch && (
                 <input required name="joinBranch" type="text" placeholder="Branch / Specialization" className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500 transition-colors placeholder:text-white/20" />
               )}
-              <select required name="joinYear" className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500 transition-colors">
-                <option value="" disabled selected>Select Year of Study</option>
+              <select required name="joinYear" defaultValue="" className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500 transition-colors">
+                <option value="" disabled>Select Year of Study</option>
                 <option value="1">1st Year</option>
                 <option value="2">2nd Year</option>
                 <option value="3">3rd Year</option>

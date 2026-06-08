@@ -37,7 +37,7 @@ export default async function EventScannerPage({ params }: { params: Promise<{ i
           </div>
           <h1 className="text-2xl font-bold text-white mb-2">{event.title}</h1>
           <p className="text-white/40 text-sm">
-            <i className="fas fa-calendar-alt mr-2"></i> {new Date(event.date_start).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
+            <i className="fas fa-calendar-alt mr-2"></i> {new Date(event.date_start).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium' })}
           </p>
         </div>
 

@@ -11,10 +11,10 @@ import PasswordRequestsTab from './PasswordRequestsTab'
 import { logAudit, fetchAuditLogs } from './audit_actions'
 
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState('events')
+  const [activeTab, setActiveTab] = useState<'users' | 'events' | 'team' | 'analytics' | 'settings' | 'about' | 'password_reqs' | 'audit'>('events')
   const supabase = createClient()
 
-  const [userRole, setUserRole] = useState<string | null>(null)
+  const [userRole, setUserRole] = useState<'admin' | 'core_member' | null>(null)
   const [users, setUsers] = useState<any[]>([])
   const [events, setEvents] = useState<any[]>([])
   const [team, setTeam] = useState<any[]>([])
@@ -23,6 +23,7 @@ export default function AdminPage() {
   const [loadingTeam, setLoadingTeam] = useState(true)
   const [auditLogs, setAuditLogs] = useState<any[]>([])
   const [loadingAudit, setLoadingAudit] = useState(true)
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [allowTeamsToggle, setAllowTeamsToggle] = useState(false)
   
   const [statusMsg, setStatusMsg] = useState<{ id: string, msg: string, type: 'error' | 'success' | 'info' } | null>(null)
@@ -54,7 +55,6 @@ export default function AdminPage() {
     setTimeout(() => setStatusMsg(null), 4000)
   }
 
-  // --- IMAGE UPLOAD HELPER ---
   async function uploadImage(file: File, pathPrefix: string) {
     const fileExt = file.name.split('.').pop()
     const fileName = `${pathPrefix}-${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`
@@ -66,7 +66,6 @@ export default function AdminPage() {
     return publicData.publicUrl
   }
 
-  // --- USERS ---
   async function fetchUsers() {
     setLoadingUsers(true)
     const { data, error } = await supabase.from('member_profiles').select('*').order('created_at', { ascending: false })
@@ -132,7 +131,6 @@ export default function AdminPage() {
 
     showStatus('create_user', 'Creating account...', 'info')
 
-    // Use a temporary client that does NOT persist the session, to avoid logging out the admin!
     const tempClient = createSupabaseClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
@@ -156,7 +154,6 @@ export default function AdminPage() {
       return
     }
 
-    // Elevate user using main admin session
     if (role !== 'user') {
       const { error: elevateError } = await supabase.rpc('set_user_roles', { target_user_id: data.user.id, new_role: role })
       if (elevateError) {
@@ -172,7 +169,6 @@ export default function AdminPage() {
     await logAudit('CREATE_USER', { new_email: email, role })
   }
 
-  // --- EVENTS ---
   async function fetchEvents() {
     setLoadingEvents(true)
     const { data, error } = await supabase.from('events').select('*').order('date_start', { ascending: false })
@@ -187,13 +183,9 @@ export default function AdminPage() {
     const dateStartRaw = formData.get('date_start') as string
     const date_start = dateStartRaw ? new Date(dateStartRaw).toISOString() : new Date().toISOString()
     const status = formData.get('status') as string
-    const location = formData.get('location') as string
-    const description = formData.get('description') as string
     const imageFile = formData.get('image') as File
     const certificateHtml = formData.get('certificate_html') as string
-    const registration_open = formData.get('registration_open') === 'on'
-
-    // Generate slug
+    
     const baseSlug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '')
     const randomSuffix = Math.random().toString(36).substring(2, 6)
     const slug = `${baseSlug}-${randomSuffix}`
@@ -225,7 +217,7 @@ export default function AdminPage() {
     const max_capacity = maxCapStr ? parseInt(maxCapStr) : null
 
     const { error } = await supabase.from('events').insert([{ 
-      title, slug, date_start, status, location, description: formData.get('description'), image_url, registration_open, form_requirements, certificate_html: certificateHtml, max_capacity 
+      title, slug, date_start, status, location: formData.get('location'), description: formData.get('description'), image_url, registration_open: formData.get('registration_open') === 'on', form_requirements, certificate_html: certificateHtml, max_capacity 
     }])
     
     if (error) {
@@ -269,7 +261,6 @@ export default function AdminPage() {
     }
   }
 
-  // --- TEAM ---
   async function fetchTeam() {
     setLoadingTeam(true)
     const { data, error } = await supabase.from('team_members').select('*').order('created_at', { ascending: true })
@@ -317,49 +308,52 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="flex h-screen bg-[#09090b] text-[#f4f4f5] font-sans overflow-hidden">
-      {/* Sidebar */}
-      <aside className="w-[260px] bg-[#18181b] border-r border-white/10 flex flex-col p-8 z-10">
-        <div className="text-2xl font-extrabold mb-10 bg-gradient-to-br from-blue-500 to-purple-500 bg-clip-text text-transparent uppercase tracking-wider flex items-center gap-2 text-center leading-tight">
+    <div className="flex flex-col md:flex-row h-screen bg-[#09090b] text-[#f4f4f5] font-sans overflow-hidden">
+      <div className="md:hidden flex items-center justify-between p-4 bg-[#18181b] border-b border-white/10 z-20">
+        <div className="text-xl font-extrabold bg-gradient-to-br from-blue-500 to-purple-500 bg-clip-text text-transparent uppercase tracking-wider">
+          {userRole === 'admin' ? 'MSC ADMIN' : 'CORE'}
+        </div>
+        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="text-white p-2">
+          <i className={`fas ${isMobileMenuOpen ? 'fa-times' : 'fa-bars'} text-xl`}></i>
+        </button>
+      </div>
+
+      <aside className={`absolute md:relative w-full md:w-[260px] bg-[#18181b] md:border-r border-white/10 flex flex-col p-8 z-10 h-full md:h-auto transition-transform duration-300 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+        <div className="hidden md:flex text-2xl font-extrabold mb-10 bg-gradient-to-br from-blue-500 to-purple-500 bg-clip-text text-transparent uppercase tracking-wider items-center gap-2 text-center leading-tight">
           {userRole === 'admin' ? 'MSC ADMIN' : 'CORE WORKSPACE'}
         </div>
         <div className="flex flex-col gap-3">
           {userRole === 'admin' && (
             <>
-              <button onClick={() => setActiveTab('users')} className={`px-5 py-3 rounded-xl font-medium transition-all text-left ${activeTab === 'users' ? 'bg-gradient-to-br from-blue-500 to-purple-500 text-white shadow-[0_4px_15px_rgba(59,130,246,0.25)]' : 'text-[#a1a1aa] hover:text-white hover:bg-white/5'}`}>User Access</button>
-              <button onClick={() => setActiveTab('audit')} className={`px-5 py-3 rounded-xl font-medium transition-all text-left ${activeTab === 'audit' ? 'bg-gradient-to-br from-blue-500 to-purple-500 text-white shadow-[0_4px_15px_rgba(59,130,246,0.25)]' : 'text-[#a1a1aa] hover:text-white hover:bg-white/5'}`}>Audit Logs</button>
-              <button onClick={() => setActiveTab('password_reqs')} className={`px-5 py-3 rounded-xl font-medium transition-all text-left flex justify-between items-center ${activeTab === 'password_reqs' ? 'bg-gradient-to-br from-yellow-500 to-orange-500 text-white shadow-[0_4px_15px_rgba(234,179,8,0.25)]' : 'text-[#a1a1aa] hover:text-white hover:bg-white/5'}`}>
-                <span>Passwords</span>
-              </button>
+              <button onClick={() => { setActiveTab('users'); setIsMobileMenuOpen(false); }} className={`px-5 py-3 rounded-xl font-medium transition-all text-left ${activeTab === 'users' ? 'bg-gradient-to-br from-blue-500 to-purple-500 text-white shadow-[0_4px_15px_rgba(59,130,246,0.25)]' : 'text-[#a1a1aa] hover:text-white hover:bg-white/5'}`}>User Access</button>
+              <button onClick={() => { setActiveTab('audit'); setIsMobileMenuOpen(false); }} className={`px-5 py-3 rounded-xl font-medium transition-all text-left ${activeTab === 'audit' ? 'bg-gradient-to-br from-blue-500 to-purple-500 text-white shadow-[0_4px_15px_rgba(59,130,246,0.25)]' : 'text-[#a1a1aa] hover:text-white hover:bg-white/5'}`}>Audit Logs</button>
+              <button onClick={() => { setActiveTab('password_reqs'); setIsMobileMenuOpen(false); }} className={`px-5 py-3 rounded-xl font-medium transition-all text-left ${activeTab === 'password_reqs' ? 'bg-gradient-to-br from-yellow-500 to-orange-500 text-white shadow-[0_4px_15px_rgba(234,179,8,0.25)]' : 'text-[#a1a1aa] hover:text-white hover:bg-white/5'}`}>Passwords</button>
             </>
           )}
-          <button onClick={() => setActiveTab('events')} className={`px-5 py-3 rounded-xl font-medium transition-all text-left ${activeTab === 'events' ? 'bg-gradient-to-br from-blue-500 to-purple-500 text-white shadow-[0_4px_15px_rgba(59,130,246,0.25)]' : 'text-[#a1a1aa] hover:text-white hover:bg-white/5'}`}>Events</button>
-          <button onClick={() => setActiveTab('team')} className={`px-5 py-3 rounded-xl font-medium transition-all text-left ${activeTab === 'team' ? 'bg-gradient-to-br from-blue-500 to-purple-500 text-white shadow-[0_4px_15px_rgba(59,130,246,0.25)]' : 'text-[#a1a1aa] hover:text-white hover:bg-white/5'}`}>Team Members</button>
-          <button onClick={() => setActiveTab('analytics')} className={`px-5 py-3 rounded-xl font-medium transition-all text-left ${activeTab === 'analytics' ? 'bg-gradient-to-br from-blue-500 to-purple-500 text-white shadow-[0_4px_15px_rgba(59,130,246,0.25)]' : 'text-[#a1a1aa] hover:text-white hover:bg-white/5'}`}>Analytics</button>
+          <button onClick={() => { setActiveTab('events'); setIsMobileMenuOpen(false); }} className={`px-5 py-3 rounded-xl font-medium transition-all text-left ${activeTab === 'events' ? 'bg-gradient-to-br from-blue-500 to-purple-500 text-white shadow-[0_4px_15px_rgba(59,130,246,0.25)]' : 'text-[#a1a1aa] hover:text-white hover:bg-white/5'}`}>Events</button>
+          <button onClick={() => { setActiveTab('team'); setIsMobileMenuOpen(false); }} className={`px-5 py-3 rounded-xl font-medium transition-all text-left ${activeTab === 'team' ? 'bg-gradient-to-br from-blue-500 to-purple-500 text-white shadow-[0_4px_15px_rgba(59,130,246,0.25)]' : 'text-[#a1a1aa] hover:text-white hover:bg-white/5'}`}>Team Members</button>
+          <button onClick={() => { setActiveTab('analytics'); setIsMobileMenuOpen(false); }} className={`px-5 py-3 rounded-xl font-medium transition-all text-left ${activeTab === 'analytics' ? 'bg-gradient-to-br from-blue-500 to-purple-500 text-white shadow-[0_4px_15px_rgba(59,130,246,0.25)]' : 'text-[#a1a1aa] hover:text-white hover:bg-white/5'}`}>Analytics</button>
           
           <div className="h-px bg-white/10 my-2"></div>
           
-          <button onClick={() => setActiveTab('settings')} className={`px-5 py-3 rounded-xl font-medium transition-all text-left ${activeTab === 'settings' ? 'bg-gradient-to-br from-blue-500 to-purple-500 text-white shadow-[0_4px_15px_rgba(59,130,246,0.25)]' : 'text-[#a1a1aa] hover:text-white hover:bg-white/5'}`}>
+          <button onClick={() => { setActiveTab('settings'); setIsMobileMenuOpen(false); }} className={`px-5 py-3 rounded-xl font-medium transition-all text-left ${activeTab === 'settings' ? 'bg-gradient-to-br from-blue-500 to-purple-500 text-white shadow-[0_4px_15px_rgba(59,130,246,0.25)]' : 'text-[#a1a1aa] hover:text-white hover:bg-white/5'}`}>
             <i className="fas fa-cog w-5"></i> Settings
           </button>
-          <button onClick={() => setActiveTab('about')} className={`px-5 py-3 rounded-xl font-medium transition-all text-left ${activeTab === 'about' ? 'bg-gradient-to-br from-blue-500 to-purple-500 text-white shadow-[0_4px_15px_rgba(59,130,246,0.25)]' : 'text-[#a1a1aa] hover:text-white hover:bg-white/5'}`}>
+          <button onClick={() => { setActiveTab('about'); setIsMobileMenuOpen(false); }} className={`px-5 py-3 rounded-xl font-medium transition-all text-left ${activeTab === 'about' ? 'bg-gradient-to-br from-blue-500 to-purple-500 text-white shadow-[0_4px_15px_rgba(59,130,246,0.25)]' : 'text-[#a1a1aa] hover:text-white hover:bg-white/5'}`}>
             <i className="fas fa-info-circle w-5"></i> About
           </button>
         </div>
       </aside>
 
-      {/* Main Content */}
-      <main className="flex-1 overflow-y-auto p-10 relative">
+      <main className="flex-1 overflow-y-auto p-4 md:p-10 relative">
         <div className="absolute top-[-100px] right-[-100px] w-[400px] h-[400px] rounded-full bg-blue-500/15 blur-[100px] z-0 pointer-events-none"></div>
         <div className="absolute bottom-[-100px] left-[10%] w-[500px] h-[500px] rounded-full bg-purple-500/10 blur-[120px] z-0 pointer-events-none"></div>
 
         <div className="relative z-10 max-w-6xl mx-auto">
-          {/* USERS TAB (Admins Only) */}
           {activeTab === 'users' && userRole === 'admin' && (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
               <h2 className="text-3xl font-bold mb-8 text-[#f4f4f5] tracking-tight">Provision Core Members</h2>
               
-              {/* Create User Form */}
               <div className="bg-[#18181b]/60 backdrop-blur-xl border border-white/10 rounded-[20px] p-8 mb-8 shadow-2xl">
                 <form onSubmit={handleCreateUser} className="grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
                   <div className="flex flex-col gap-2">
@@ -383,7 +377,6 @@ export default function AdminPage() {
                 {statusMsg?.id === 'create_user' && <div className={`mt-4 text-sm font-semibold ${statusMsg.type === 'error' ? 'text-red-500' : statusMsg.type === 'success' ? 'text-green-500' : 'text-blue-400'}`}>{statusMsg.msg}</div>}
               </div>
 
-              {/* User Table */}
               <div className="bg-[#18181b]/60 backdrop-blur-xl border border-white/10 rounded-[20px] overflow-hidden shadow-2xl">
                 <table className="w-full text-left border-collapse">
                   <thead>
@@ -427,12 +420,10 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* EVENTS TAB */}
           {activeTab === 'events' && (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
               <h2 className="text-3xl font-bold mb-8 text-[#f4f4f5] tracking-tight">Events Management</h2>
               
-              {/* Create Event Form */}
               {userRole === 'admin' && (
                 <div className="bg-[#18181b]/60 backdrop-blur-xl border border-white/10 rounded-[20px] p-8 mb-8 shadow-2xl">
                 <form onSubmit={handleCreateEvent} className="flex flex-col gap-6">
@@ -442,8 +433,8 @@ export default function AdminPage() {
                       <input type="text" name="title" required placeholder="e.g. Hackathon 2026" className="p-3 bg-black/40 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500" />
                     </div>
                     <div className="flex flex-col gap-2">
-                      <label className="text-[13px] font-semibold text-[#a1a1aa] uppercase tracking-wider">Date & Time</label>
-                      <input type="datetime-local" name="date_start" required className="p-3 bg-black/40 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500" />
+                      <label className="text-[13px] font-semibold text-[#a1a1aa] uppercase tracking-wider">Date</label>
+                      <input type="date" name="date_start" required className="p-3 bg-black/40 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500" />
                     </div>
                     <div className="flex flex-col gap-2">
                       <label className="text-[13px] font-semibold text-[#a1a1aa] uppercase tracking-wider">Status</label>
@@ -497,7 +488,6 @@ export default function AdminPage() {
                     ></textarea>
                   </div>
 
-                  {/* Form Builder Section */}
                   <div className="mt-4 p-5 bg-black/30 border border-white/5 rounded-xl">
                     <h3 className="text-sm font-bold text-white mb-4 uppercase tracking-wider">Public Registration Form Setup</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -553,7 +543,6 @@ export default function AdminPage() {
               </div>
               )}
 
-              {/* Event Table */}
               <div className="bg-[#18181b]/60 backdrop-blur-xl border border-white/10 rounded-[20px] overflow-hidden shadow-2xl">
                 <table className="w-full text-left border-collapse">
                   <thead>
@@ -575,7 +564,7 @@ export default function AdminPage() {
                               {evt.title} <i className="fas fa-external-link-alt text-[10px]"></i>
                             </Link>
                           </td>
-                          <td className="p-5 border-b border-white/5">{new Date(evt.date_start).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</td>
+                          <td className="p-5 border-b border-white/5">{new Date(evt.date_start).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium' })}</td>
                           <td className="p-5 border-b border-white/5"><span className={`px-3 py-1 border rounded-full text-xs font-bold uppercase tracking-wider ${evt.status === 'upcoming' ? 'bg-green-500/15 text-green-500 border-green-500/30' : 'bg-gray-500/15 text-gray-400 border-gray-500/30'}`}>{evt.status}</span></td>
                           <td className="p-5 border-b border-white/5 text-right space-x-2">
                             <span className={`text-sm mr-4 ${statusMsg?.id === `event_${evt.id}` ? (statusMsg.type === 'error' ? 'text-red-500' : statusMsg.type === 'success' ? 'text-green-500' : 'text-gray-400') : 'hidden'}`}>{statusMsg?.id === `event_${evt.id}` ? statusMsg.msg : ''}</span>
@@ -605,12 +594,10 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* TEAM TAB */}
           {activeTab === 'team' && (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
               <h2 className="text-3xl font-bold mb-8 text-[#f4f4f5] tracking-tight">Team Directory</h2>
               
-              {/* Create Team Form */}
               {userRole === 'admin' && (
                 <div className="bg-[#18181b]/60 backdrop-blur-xl border border-white/10 rounded-[20px] p-8 mb-8 shadow-2xl">
                 <form onSubmit={handleCreateTeam} className="flex flex-col gap-6">
@@ -651,7 +638,6 @@ export default function AdminPage() {
               </div>
               )}
 
-              {/* Team Table */}
               <div className="bg-[#18181b]/60 backdrop-blur-xl border border-white/10 rounded-[20px] overflow-hidden shadow-2xl">
                 <table className="w-full text-left border-collapse">
                   <thead>
@@ -683,10 +669,8 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ANALYTICS TAB */}
           {activeTab === 'analytics' && <AnalyticsDashboard />}
 
-          {/* AUDIT LOGS TAB (Admins Only) */}
           {userRole === 'admin' && activeTab === 'audit' && (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div className="flex justify-between items-center mb-8">

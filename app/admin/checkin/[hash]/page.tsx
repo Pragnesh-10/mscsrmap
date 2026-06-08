@@ -66,16 +66,36 @@ export default async function CheckinPage({ params, searchParams }: { params: Pr
     )
   }
 
-  const isCheckedIn = reg.checked_in
+  const isTeam = reg.team_data && reg.team_data.members && reg.team_data.members.length > 0;
+  const primaryCheckedIn = reg.checked_in;
+  const allMembersCheckedIn = isTeam ? reg.team_data.members.every((m: any) => m.checked_in) : true;
+  const completelyCheckedIn = primaryCheckedIn && allMembersCheckedIn;
   const event = reg.events
 
-  // The Server Action to check them in
-  async function markAsAttended() {
+  // The Server Action to check in Primary
+  async function markPrimaryAsAttended() {
     'use server'
     const sb = await createClient()
     await sb.from('registrations').update({ checked_in: true }).eq('hash_payload', hash)
     revalidatePath(`/admin/checkin/${hash}`)
     await logAudit('SCAN_TICKET', { hash, event_title: reg.events.title, lead_email: reg.lead_email })
+  }
+
+  // The Server Action to check in an individual Team Member
+  async function markMemberAsAttended(memberIndex: number) {
+    'use server'
+    const sb = await createClient()
+    const { data: latestReg } = await sb.from('registrations').select('team_data').eq('hash_payload', hash).single()
+    if (!latestReg || !latestReg.team_data || !latestReg.team_data.members) return;
+    
+    const updatedTeamData = { ...latestReg.team_data }
+    if (updatedTeamData.members[memberIndex]) {
+      updatedTeamData.members[memberIndex].checked_in = true
+    }
+    
+    await sb.from('registrations').update({ team_data: updatedTeamData }).eq('hash_payload', hash)
+    revalidatePath(`/admin/checkin/${hash}`)
+    await logAudit('SCAN_TICKET_MEMBER', { hash, member_index: memberIndex, event_title: reg.events.title })
   }
 
   return (
@@ -94,23 +114,23 @@ export default async function CheckinPage({ params, searchParams }: { params: Pr
         </div>
 
         {/* Status Banner */}
-        <div className={`w-full p-6 rounded-2xl mb-8 flex items-center gap-4 shadow-xl border ${isCheckedIn ? 'bg-green-500/10 border-green-500/20' : 'bg-[#18181b] border-white/10'}`}>
-          <div className={`w-14 h-14 rounded-full flex items-center justify-center border ${isCheckedIn ? 'bg-green-500/20 border-green-500/30 text-green-500' : 'bg-blue-500/10 border-blue-500/20 text-blue-400'}`}>
-            <i className={`fas ${isCheckedIn ? 'fa-check-double text-xl' : 'fa-ticket-alt text-xl'}`}></i>
+        <div className={`w-full p-6 rounded-2xl mb-8 flex items-center gap-4 shadow-xl border ${completelyCheckedIn ? 'bg-green-500/10 border-green-500/20' : 'bg-[#18181b] border-white/10'}`}>
+          <div className={`w-14 h-14 rounded-full flex items-center justify-center border ${completelyCheckedIn ? 'bg-green-500/20 border-green-500/30 text-green-500' : 'bg-blue-500/10 border-blue-500/20 text-blue-400'}`}>
+            <i className={`fas ${completelyCheckedIn ? 'fa-check-double text-xl' : 'fa-ticket-alt text-xl'}`}></i>
           </div>
           <div>
-            <h2 className={`text-2xl font-bold ${isCheckedIn ? 'text-green-400' : 'text-white'}`}>
-              {isCheckedIn ? 'Already Checked In!' : 'Valid Ticket Found'}
+            <h2 className={`text-2xl font-bold ${completelyCheckedIn ? 'text-green-400' : 'text-white'}`}>
+              {completelyCheckedIn ? 'Everyone Checked In!' : isTeam ? 'Valid Team Ticket' : 'Valid Ticket Found'}
             </h2>
-            <p className={`${isCheckedIn ? 'text-green-500/60' : 'text-blue-400/60'} text-sm font-medium`}>
+            <p className={`${completelyCheckedIn ? 'text-green-500/60' : 'text-blue-400/60'} text-sm font-medium`}>
               {event.title}
             </p>
           </div>
         </div>
 
-        {/* Action Button */}
-        {!isCheckedIn && (
-          <form action={markAsAttended} className="mb-8">
+        {/* Global Action Button (Only if NOT a team) */}
+        {!isTeam && !primaryCheckedIn && (
+          <form action={markPrimaryAsAttended} className="mb-8">
             <button type="submit" className="w-full py-5 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 rounded-2xl font-bold text-lg transition-all shadow-[0_0_30px_rgba(59,130,246,0.2)] text-white flex justify-center items-center gap-3">
               <i className="fas fa-user-check"></i> Mark as Attended
             </button>
@@ -155,6 +175,23 @@ export default async function CheckinPage({ params, searchParams }: { params: Pr
               </div>
             )}
           </div>
+          {/* Individual Check In for Primary if Team Mode */}
+          {isTeam && (
+            <div className="mt-6 pt-6 border-t border-white/5 flex items-center justify-between">
+              <span className="text-sm font-bold text-white/60">Check-In Status</span>
+              {primaryCheckedIn ? (
+                <span className="px-4 py-2 bg-green-500/10 border border-green-500/30 text-green-500 rounded-lg text-sm font-bold flex items-center gap-2">
+                  <i className="fas fa-check-circle"></i> Checked In
+                </span>
+              ) : (
+                <form action={markPrimaryAsAttended}>
+                  <button type="submit" className="px-5 py-2 bg-blue-500 hover:bg-blue-600 rounded-xl text-white font-bold transition-colors text-sm shadow-[0_0_15px_rgba(59,130,246,0.3)]">
+                    Check In Primary
+                  </button>
+                </form>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Team Details (If any) */}
@@ -213,6 +250,21 @@ export default async function CheckinPage({ params, searchParams }: { params: Pr
                           <p className="text-[10px] font-semibold text-white/40 uppercase tracking-wider mb-1">Year</p>
                           <p className="text-sm font-bold text-white/90">{member.year}</p>
                         </div>
+                      )}
+                    </div>
+                    {/* Individual Check In for Team Member */}
+                    <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between">
+                      <span className="text-xs font-bold text-white/60">Check-In Status</span>
+                      {member.checked_in ? (
+                        <span className="px-3 py-1.5 bg-green-500/10 border border-green-500/30 text-green-500 rounded-lg text-xs font-bold flex items-center gap-2">
+                          <i className="fas fa-check-circle"></i> Checked In
+                        </span>
+                      ) : (
+                        <form action={markMemberAsAttended.bind(null, index)}>
+                          <button type="submit" className="px-4 py-1.5 bg-blue-500 hover:bg-blue-600 rounded-lg text-white font-bold transition-colors text-xs shadow-[0_0_10px_rgba(59,130,246,0.3)]">
+                            Check In Member
+                          </button>
+                        </form>
                       )}
                     </div>
                   </div>
