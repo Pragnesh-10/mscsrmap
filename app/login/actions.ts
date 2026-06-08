@@ -32,6 +32,17 @@ export async function requestPasswordReset(formData: FormData) {
     return { error: 'Email and new password are required.' }
   }
 
+  // Check if the user exists in member_profiles
+  const { data: profile, error: profileError } = await supabase
+    .from('member_profiles')
+    .select('email')
+    .eq('email', email)
+    .single()
+
+  if (profileError || !profile) {
+    return { error: 'No account found with this email address.' }
+  }
+
   // Insert the pending request
   const { error } = await supabase
     .from('password_reset_requests')
