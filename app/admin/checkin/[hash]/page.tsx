@@ -44,7 +44,9 @@ export default async function CheckinPage({ params, searchParams }: { params: Pr
           </div>
           <h2 className="text-2xl font-bold mb-2">Invalid Ticket</h2>
           <p className="text-white/60 mb-8">This QR code does not match any valid registration in the database. It may be forged or from an old event.</p>
-          <Link href="/admin" className="text-blue-400 hover:text-blue-300 text-sm font-semibold">Back to Dashboard</Link>
+          <Link href={eventId ? `/admin/events/${eventId}/scanner` : "/admin"} className="text-blue-400 hover:text-blue-300 text-sm font-semibold">
+            {eventId ? "Back to Scanner" : "Back to Dashboard"}
+          </Link>
         </div>
       </div>
     )
@@ -105,8 +107,8 @@ export default async function CheckinPage({ params, searchParams }: { params: Pr
       
       <div className="w-full max-w-3xl">
         <div className="flex justify-between items-center mb-8">
-          <Link href="/admin" className="text-white/40 hover:text-white transition-colors flex items-center gap-2 text-sm font-semibold">
-            <i className="fas fa-arrow-left"></i> Workspace Dashboard
+          <Link href={eventId ? `/admin/events/${eventId}/scanner` : "/admin"} className="text-white/40 hover:text-white transition-colors flex items-center gap-2 text-sm font-semibold">
+            <i className="fas fa-arrow-left"></i> {eventId ? "Back to Scanner" : "Workspace Dashboard"}
           </Link>
           <div className="px-3 py-1 bg-white/5 border border-white/10 rounded-full text-xs font-bold text-white/60 tracking-wider">
             CHECK-IN PORTAL
