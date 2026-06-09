@@ -309,7 +309,7 @@ export default function AdminPage() {
 
   return (
     <div className="flex flex-col md:flex-row h-screen bg-[#09090b] text-[#f4f4f5] font-sans overflow-hidden">
-      <div className="md:hidden flex items-center justify-between p-4 bg-[#18181b] border-b border-white/10 z-20">
+      <div className="md:hidden relative flex items-center justify-between p-4 bg-[#18181b] border-b border-white/10 z-50 shadow-md">
         <div className="text-xl font-extrabold bg-gradient-to-br from-blue-500 to-purple-500 bg-clip-text text-transparent uppercase tracking-wider">
           {userRole === 'admin' ? 'MSC ADMIN' : 'CORE'}
         </div>
@@ -318,7 +318,7 @@ export default function AdminPage() {
         </button>
       </div>
 
-      <aside className={`absolute md:relative w-full md:w-[260px] bg-[#18181b] md:border-r border-white/10 flex flex-col p-8 z-10 h-full md:h-auto transition-transform duration-300 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+      <aside className={`fixed top-[60px] md:top-0 left-0 md:relative w-full md:w-[260px] bg-[#18181b] md:border-r border-white/10 flex flex-col p-8 z-40 h-[calc(100vh-60px)] md:h-auto transition-transform duration-300 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'} overflow-y-auto`}>
         <div className="hidden md:flex text-2xl font-extrabold mb-10 bg-gradient-to-br from-blue-500 to-purple-500 bg-clip-text text-transparent uppercase tracking-wider items-center gap-2 text-center leading-tight">
           {userRole === 'admin' ? 'MSC ADMIN' : 'CORE WORKSPACE'}
         </div>
