@@ -10,6 +10,7 @@ export default function EditEventForm({ event }: { event: any }) {
   const router = useRouter()
   const [allowTeamsToggle, setAllowTeamsToggle] = useState(event.form_requirements?.allow_teams || false)
   const [existingGallery, setExistingGallery] = useState<string[]>(event.gallery_urls || [])
+  const [newGalleryFiles, setNewGalleryFiles] = useState<File[]>([])
   const [statusMsg, setStatusMsg] = useState<{ id: string, msg: string, type: 'error' | 'success' | 'info' } | null>(null)
   const supabase = createClient()
 
@@ -43,7 +44,7 @@ export default function EditEventForm({ event }: { event: any }) {
     const imageFile = formData.get('image') as File
     const certificateHtml = formData.get('certificate_html') as string
     const registration_open = formData.get('registration_open') === 'on'
-    const galleryFiles = formData.getAll('gallery') as File[]
+    const galleryFiles = newGalleryFiles
 
     const form_requirements: Record<string, any> = {
       req_reg_num: formData.get('req_reg_num') === 'on',
@@ -198,7 +199,24 @@ export default function EditEventForm({ event }: { event: any }) {
             </div>
           )}
 
-          <input type="file" name="gallery" accept="image/*" multiple className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-blue-500/20 file:text-blue-400 hover:file:bg-blue-500/30 transition-all cursor-pointer" />
+          <input 
+            type="file" 
+            accept="image/*" 
+            multiple 
+            onChange={(e) => {
+              if (e.target.files) {
+                setNewGalleryFiles(prev => [...prev, ...Array.from(e.target.files!)])
+              }
+            }}
+            className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-blue-500/20 file:text-blue-400 hover:file:bg-blue-500/30 transition-all cursor-pointer" 
+          />
+          
+          {newGalleryFiles.length > 0 && (
+            <div className="mt-3">
+              <span className="text-xs text-blue-400 font-bold">{newGalleryFiles.length} new photos selected</span>
+              <button type="button" onClick={() => setNewGalleryFiles([])} className="ml-3 text-xs text-red-400 hover:text-red-300">Clear Selection</button>
+            </div>
+          )}
         </div>
 
         {/* Form Builder Section */}

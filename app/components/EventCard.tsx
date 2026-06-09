@@ -33,7 +33,11 @@ export default function EventCard({ event, isPast }: { event: any, isPast: boole
         {/* We can show an extra summary or link when expanded */}
         <div className="event-summary">
           <p>Join us to explore and learn together!</p>
-          {!isPast && (
+          {isPast ? (
+            <a href={`/events/${event.slug || event.id}`} className="gallery-link" onClick={e => e.stopPropagation()}>
+              View Certificates & Details <i className="fa-solid fa-arrow-right"></i>
+            </a>
+          ) : (
             <a href={`/events/${event.slug || event.id}`} className="gallery-link" onClick={e => e.stopPropagation()}>
               Register Now <i className="fa-solid fa-arrow-right"></i>
             </a>

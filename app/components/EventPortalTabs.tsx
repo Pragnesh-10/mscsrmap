@@ -6,7 +6,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import { submitPublicRegistration, lookupTeamRegistration, joinMatchmakingTeam } from '../events/actions'
 
 export default function EventPortalTabs({ event, isWaitlistMode = false, openTeams = [], invitedTeam = null }: { event: any, isWaitlistMode?: boolean, openTeams?: any[], invitedTeam?: any }) {
-  const [activeTab, setActiveTab] = useState<'register' | 'matchmaking' | 'check' | 'certificate'>('register')
+  const [activeTab, setActiveTab] = useState<'register' | 'matchmaking' | 'check' | 'certificate'>(event.status === 'completed' ? 'check' : 'register')
   const [mounted, setMounted] = useState(false)
   const [isCreatingTeam, setIsCreatingTeam] = useState(false)
 
@@ -264,15 +264,17 @@ export default function EventPortalTabs({ event, isWaitlistMode = false, openTea
       <div className="w-full">
         {/* Tabs */}
         <div className="flex flex-col md:flex-row gap-2 mb-8 bg-[#18181b]/40 backdrop-blur-md p-2 rounded-2xl border border-white/5">
-          <button 
-            onClick={() => setActiveTab('register')}
-            className={`flex-1 py-4 text-center font-bold text-sm transition-all flex flex-col items-center justify-center gap-1 ${activeTab === 'register' ? (isWaitlistMode ? 'text-yellow-400 bg-yellow-400/5 shadow-[inset_0_-2px_0_rgba(234,179,8,1)]' : 'text-blue-400 bg-blue-500/5 shadow-[inset_0_-2px_0_rgba(59,130,246,1)]') : 'text-white/40 hover:text-white/80 hover:bg-white/5'}`}
-          >
-            <i className={`fas ${isWaitlistMode ? 'fa-clock' : 'fa-user-plus'} text-lg mb-1`}></i>
-            {isWaitlistMode ? 'Join Waitlist' : 'Register Now'}
-          </button>
+          {event.status !== 'completed' && (
+            <button 
+              onClick={() => setActiveTab('register')}
+              className={`flex-1 py-4 text-center font-bold text-sm transition-all flex flex-col items-center justify-center gap-1 ${activeTab === 'register' ? (isWaitlistMode ? 'text-yellow-400 bg-yellow-400/5 shadow-[inset_0_-2px_0_rgba(234,179,8,1)]' : 'text-blue-400 bg-blue-500/5 shadow-[inset_0_-2px_0_rgba(59,130,246,1)]') : 'text-white/40 hover:text-white/80 hover:bg-white/5'}`}
+            >
+              <i className={`fas ${isWaitlistMode ? 'fa-clock' : 'fa-user-plus'} text-lg mb-1`}></i>
+              {isWaitlistMode ? 'Join Waitlist' : 'Register Now'}
+            </button>
+          )}
 
-          {reqs.allow_teams && (
+          {event.status !== 'completed' && reqs.allow_teams && (
             <button 
               onClick={() => setActiveTab('matchmaking')}
               className={`flex-1 py-4 text-center font-bold text-sm transition-all flex flex-col items-center justify-center gap-1 ${activeTab === 'matchmaking' ? 'text-cyan-400 bg-cyan-500/5 shadow-[inset_0_-2px_0_rgba(34,211,238,1)]' : 'text-white/40 hover:text-white/80 hover:bg-white/5'}`}
