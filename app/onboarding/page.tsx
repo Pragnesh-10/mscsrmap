@@ -32,7 +32,7 @@ export default function OnboardingPage() {
               type="text"
               name="fullName"
               required
-              placeholder="e.g. John Doe"
+              placeholder="e.g. Full Name"
               className="w-full p-3 bg-black/50 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#0078d4] transition-colors"
             />
           </div>

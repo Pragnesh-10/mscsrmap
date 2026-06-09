@@ -607,7 +607,7 @@ export default function AdminPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="flex flex-col gap-2">
                       <label className="text-[13px] font-semibold text-[#a1a1aa] uppercase tracking-wider">Full Name</label>
-                      <input type="text" name="name" required placeholder="e.g. John Doe" className="p-3 bg-black/40 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500" />
+                      <input type="text" name="name" required placeholder="e.g. Full Name" className="p-3 bg-black/40 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500" />
                     </div>
                     <div className="flex flex-col gap-2">
                       <label className="text-[13px] font-semibold text-[#a1a1aa] uppercase tracking-wider">Role</label>
@@ -618,7 +618,7 @@ export default function AdminPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="flex flex-col gap-2">
                       <label className="text-[13px] font-semibold text-[#a1a1aa] uppercase tracking-wider">LinkedIn URL</label>
-                      <input type="url" name="linkedin_url" placeholder="https://linkedin.com/in/..." className="p-3 bg-black/40 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500" />
+                      <input type="url" name="linkedin_url" placeholder="https://www.linkedin.com/..." className="p-3 bg-black/40 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500" />
                     </div>
                     <div className="flex flex-col gap-2">
                       <label className="text-[13px] font-semibold text-[#a1a1aa] uppercase tracking-wider">GitHub URL</label>

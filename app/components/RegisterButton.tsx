@@ -159,7 +159,7 @@ export default function RegisterButton({ eventId, eventTitle, isRegistrationOpen
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="flex flex-col gap-2">
                   <label className="text-[13px] font-semibold text-[#a1a1aa] uppercase tracking-wider">Full Name</label>
-                  <input type="text" name="fullName" required placeholder="John Doe" className="p-3 bg-black/40 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500" />
+                  <input type="text" name="fullName" required placeholder="Full Name" className="p-3 bg-black/40 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500" />
                 </div>
                 <div className="flex flex-col gap-2">
                   <label className="text-[13px] font-semibold text-[#a1a1aa] uppercase tracking-wider">Student Email Address</label>
