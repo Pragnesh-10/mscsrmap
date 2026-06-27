@@ -25,12 +25,12 @@ export default async function CheckinPage({ params, searchParams }: { params: Pr
     )
   }
 
-  // Fetch the registration
+  // Fetch the registration (including events slug)
   const { data: reg, error } = await supabase
     .from('registrations')
     .select(`
       *,
-      events ( title, date_start, location )
+      events ( id, title, date_start, location, slug )
     `)
     .eq('hash_payload', hash)
     .single()
@@ -52,8 +52,13 @@ export default async function CheckinPage({ params, searchParams }: { params: Pr
     )
   }
 
-  // Cross-reference with the scanner's event ID if provided
-  if (eventId && reg.event_id !== eventId) {
+  // Cross-reference with the scanner's event ID or event slug if provided
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(eventId || '')
+  const matchesEvent = eventId 
+    ? (isUUID ? reg.event_id === eventId : (reg.events as any)?.slug === eventId)
+    : true
+
+  if (eventId && !matchesEvent) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#0a0a0b] text-white p-6">
         <div className="p-8 bg-[#18181b] border border-orange-500/20 rounded-2xl text-center w-full max-w-md shadow-2xl">
@@ -61,7 +66,7 @@ export default async function CheckinPage({ params, searchParams }: { params: Pr
             <i className="fas fa-exclamation-triangle text-3xl text-orange-500"></i>
           </div>
           <h2 className="text-2xl font-bold mb-2">Wrong Event!</h2>
-          <p className="text-white/60 mb-8">This ticket is valid, but it is for <strong>{reg.events.title}</strong>, not the event you are currently scanning for.</p>
+          <p className="text-white/60 mb-8">This ticket is valid, but it is for <strong>{(reg.events as any)?.title}</strong>, not the event you are currently scanning for.</p>
           <Link href={`/admin/events/${eventId}/scanner`} className="text-blue-400 hover:text-blue-300 text-sm font-semibold">Back to Scanner</Link>
         </div>
       </div>

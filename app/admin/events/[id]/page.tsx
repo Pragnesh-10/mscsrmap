@@ -23,20 +23,21 @@ export default async function AdminEventViewer({ params }: { params: Promise<{ i
 
   const userRole = profile?.role
 
-  // Fetch Event
+  // Fetch Event by slug (or UUID fallback)
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
   const { data: event, error: eventError } = await supabase
     .from('events')
     .select('*')
-    .eq('id', id)
+    .or(`slug.eq.${id}${isUUID ? `,id.eq.${id}` : ''}`)
     .single()
 
   if (eventError || !event) return notFound()
 
-  // Fetch all registrations for this event
+  // Fetch all registrations using the verified event UUID
   const { data: registrations, error: regsError } = await supabase
     .from('registrations')
     .select('*')
-    .eq('event_id', id)
+    .eq('event_id', event.id)
     .order('created_at', { ascending: false })
 
   return (
@@ -66,19 +67,19 @@ export default async function AdminEventViewer({ params }: { params: Promise<{ i
 
           {/* Quick Actions */}
           <div className="mb-8 flex flex-wrap gap-4">
-            <Link href={`/admin/events/${id}/scanner`} className="px-6 py-3 bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500 hover:text-white rounded-xl font-bold transition-colors flex items-center gap-3">
+            <Link href={`/admin/events/${event.slug || id}/scanner`} className="px-6 py-3 bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500 hover:text-white rounded-xl font-bold transition-colors flex items-center gap-3">
               <i className="fas fa-qrcode"></i> Open Live Scanner
             </Link>
             {userRole === 'admin' && (
-              <Link href={`/admin/events/${id}/edit`} className="px-6 py-3 bg-white/5 text-white/80 border border-white/10 hover:bg-white/10 hover:text-white rounded-xl font-bold transition-colors flex items-center gap-3">
+              <Link href={`/admin/events/${event.slug || id}/edit`} className="px-6 py-3 bg-white/5 text-white/80 border border-white/10 hover:bg-white/10 hover:text-white rounded-xl font-bold transition-colors flex items-center gap-3">
                 <i className="fas fa-edit"></i> Edit Event Details
               </Link>
             )}
           </div>
 
-          <CSVImportBlock eventId={id} />
+          <CSVImportBlock eventId={event.id} />
 
-          <RegistrationsTable registrations={registrations || []} eventTitle={event.title} eventId={id} />
+          <RegistrationsTable registrations={registrations || []} eventTitle={event.title} eventId={event.id} />
         </div>
       </main>
     </div>

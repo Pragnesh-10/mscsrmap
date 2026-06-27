@@ -177,7 +177,17 @@ export default function RegisterButton({ eventId, eventTitle, isRegistrationOpen
                 {reqs.req_branch && (
                   <div className="flex flex-col gap-2">
                     <label className="text-[13px] font-semibold text-[#a1a1aa] uppercase tracking-wider">Branch</label>
-                    <input type="text" name="branch" required placeholder="e.g. CSE" className="p-3 bg-black/40 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500" />
+                    <select name="branch" required defaultValue="" className="p-3 bg-black/40 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500 w-full">
+                      <option value="" disabled>Select Branch</option>
+                      <option value="CSE">CSE</option>
+                      <option value="ECE">ECE</option>
+                      <option value="EEE">EEE</option>
+                      <option value="BSc">BSc</option>
+                      <option value="BBA">BBA</option>
+                      <option value="MBA">MBA</option>
+                      <option value="Mechanical">Mechanical</option>
+                      <option value="others">others</option>
+                    </select>
                   </div>
                 )}
                 {reqs.req_spec && (
@@ -188,7 +198,13 @@ export default function RegisterButton({ eventId, eventTitle, isRegistrationOpen
                 )}
                 <div className="flex flex-col gap-2">
                   <label className="text-[13px] font-semibold text-[#a1a1aa] uppercase tracking-wider">Year of Study</label>
-                  <input type="text" name="year" required placeholder="e.g. 2nd Year" className="p-3 bg-black/40 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500" />
+                  <select name="year" required defaultValue="" className="p-3 bg-black/40 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500">
+                    <option value="" disabled>Select Year</option>
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                  </select>
                 </div>
               </div>
 
@@ -243,7 +259,17 @@ export default function RegisterButton({ eventId, eventTitle, isRegistrationOpen
                             {reqs.req_branch && (
                               <div className="flex flex-col gap-2">
                                 <label className="text-[12px] font-semibold text-[#a1a1aa] uppercase tracking-wider">Branch</label>
-                                <input type="text" name={`member_${num}_branch`} required placeholder="Branch" className="p-2 bg-black/40 border border-white/10 rounded-lg text-white focus:outline-none focus:border-blue-500" />
+                                <select name={`member_${num}_branch`} required defaultValue="" className="p-2 bg-black/40 border border-white/10 rounded-lg text-white focus:outline-none focus:border-blue-500 w-full">
+                                  <option value="" disabled>Select Branch</option>
+                                  <option value="CSE">CSE</option>
+                                  <option value="ECE">ECE</option>
+                                  <option value="EEE">EEE</option>
+                                  <option value="BSc">BSc</option>
+                                  <option value="BBA">BBA</option>
+                                  <option value="MBA">MBA</option>
+                                  <option value="Mechanical">Mechanical</option>
+                                  <option value="others">others</option>
+                                </select>
                               </div>
                             )}
                             {reqs.req_spec && (
@@ -254,7 +280,13 @@ export default function RegisterButton({ eventId, eventTitle, isRegistrationOpen
                             )}
                             <div className="flex flex-col gap-2">
                               <label className="text-[12px] font-semibold text-[#a1a1aa] uppercase tracking-wider">Year</label>
-                              <input type="text" name={`member_${num}_year`} required placeholder="Year" className="p-2 bg-black/40 border border-white/10 rounded-lg text-white focus:outline-none focus:border-blue-500" />
+                              <select name={`member_${num}_year`} required defaultValue="" className="p-2 bg-black/40 border border-white/10 rounded-lg text-white focus:outline-none focus:border-blue-500">
+                                <option value="" disabled>Select Year</option>
+                                <option value="1">1</option>
+                                <option value="2">2</option>
+                                <option value="3">3</option>
+                                <option value="4">4</option>
+                              </select>
                             </div>
                           </div>
                         </div>

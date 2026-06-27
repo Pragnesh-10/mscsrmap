@@ -13,11 +13,12 @@ export default async function EventScannerPage({ params }: { params: Promise<{ i
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) return notFound()
 
-  // Fetch Event
+  // Fetch Event by slug or ID fallback
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
   const { data: event, error: eventError } = await supabase
     .from('events')
-    .select('title, date_start')
-    .eq('id', id)
+    .select('id, title, date_start, slug')
+    .or(`slug.eq.${id}${isUUID ? `,id.eq.${id}` : ''}`)
     .single()
 
   if (eventError || !event) return notFound()
@@ -27,7 +28,7 @@ export default async function EventScannerPage({ params }: { params: Promise<{ i
       <div className="absolute top-[-100px] left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-blue-500/10 blur-[150px] z-0 pointer-events-none"></div>
       
       <div className="relative z-10 max-w-xl w-full">
-        <Link href={`/admin/events/${id}`} className="text-white/40 hover:text-white transition-colors flex items-center gap-2 text-sm font-semibold mb-8">
+        <Link href={`/admin/events/${event.slug || id}`} className="text-white/40 hover:text-white transition-colors flex items-center gap-2 text-sm font-semibold mb-8">
           <i className="fas fa-arrow-left"></i> Back to Event
         </Link>
         
@@ -41,7 +42,7 @@ export default async function EventScannerPage({ params }: { params: Promise<{ i
           </p>
         </div>
 
-        <QRScanner eventId={id} />
+        <QRScanner eventId={event.id} />
       </div>
     </div>
   )

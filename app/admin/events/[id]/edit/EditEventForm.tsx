@@ -39,6 +39,7 @@ export default function EditEventForm({ event }: { event: any }) {
     const dateStartRaw = formData.get('date_start') as string
     const date_start = dateStartRaw ? new Date(dateStartRaw).toISOString() : new Date().toISOString()
     const status = formData.get('status') as string
+    const type = formData.get('type') as string
     const location = formData.get('location') as string
     const description = formData.get('description') as string
     const imageFile = formData.get('image') as File
@@ -88,7 +89,7 @@ export default function EditEventForm({ event }: { event: any }) {
     const finalGallery = [...existingGallery, ...newGalleryUrls]
 
     const updateData = {
-      title, date_start, status, location, description, image_url, registration_open, form_requirements, certificate_html: certificateHtml, max_capacity, gallery_urls: finalGallery 
+      title, date_start, status, type, location, description, image_url, registration_open, form_requirements, certificate_html: certificateHtml, max_capacity, gallery_urls: finalGallery 
     }
 
     const res = await updateEventDetails(event.id, updateData)
@@ -98,7 +99,7 @@ export default function EditEventForm({ event }: { event: any }) {
     } else {
       showStatus('edit_event', 'Event Updated Successfully!', 'success')
       setTimeout(() => {
-        router.push(`/admin/events/${event.id}`)
+        router.push(`/admin/events/${event.slug || event.id}`)
       }, 1500)
     }
   }
@@ -113,7 +114,7 @@ export default function EditEventForm({ event }: { event: any }) {
   return (
     <div className="bg-[#18181b]/60 backdrop-blur-xl border border-white/10 rounded-[20px] p-8 mb-8 shadow-2xl">
       <form onSubmit={handleEditEvent} className="flex flex-col gap-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="flex flex-col gap-2">
             <label className="text-[13px] font-semibold text-[#a1a1aa] uppercase tracking-wider">Event Title</label>
             <input type="text" name="title" required defaultValue={event.title} className="p-3 bg-black/40 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500" />
@@ -127,6 +128,13 @@ export default function EditEventForm({ event }: { event: any }) {
             <select name="status" defaultValue={event.status} className="p-3 bg-black/40 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500 appearance-none">
               <option value="upcoming">Upcoming</option>
               <option value="completed">Completed</option>
+            </select>
+          </div>
+          <div className="flex flex-col gap-2">
+            <label className="text-[13px] font-semibold text-[#a1a1aa] uppercase tracking-wider">Event Type</label>
+            <select name="type" defaultValue={event.type || 'hackathon'} className="p-3 bg-black/40 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500 appearance-none">
+              <option value="hackathon">Hackathon</option>
+              <option value="workshop">Workshop</option>
             </select>
           </div>
         </div>

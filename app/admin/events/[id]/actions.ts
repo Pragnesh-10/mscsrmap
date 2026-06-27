@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { logAudit } from '../../audit_actions'
+import { sendRegistrationEmail } from '@/utils/resend'
 
 export async function assignCertificates(eventId: string, registrationIds: string[], type: string) {
   const supabase = await createClient()
@@ -148,6 +149,13 @@ export async function importExternalRegistrations(eventId: string, rows: any[]) 
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
+  // Fetch event details for confirmation emails
+  const { data: eventData } = await supabaseAdmin
+    .from('events')
+    .select('title, date_start, location')
+    .eq('id', eventId)
+    .single();
+
   let successCount = 0;
   let skipCount = 0;
   let errors: string[] = [];
@@ -230,12 +238,13 @@ export async function importExternalRegistrations(eventId: string, rows: any[]) 
         members: [] // Not parsing complex nested members for now
       } : null;
 
+      const hashPayload = require('crypto').randomUUID();
       const { error: regError } = await supabaseAdmin.from('registrations').insert({
         event_id: eventId,
         lead_email: email,
         form_data: formData,
         team_data: teamData,
-        hash_payload: require('crypto').randomUUID()
+        hash_payload: hashPayload
       });
 
       if (regError) {
@@ -243,6 +252,25 @@ export async function importExternalRegistrations(eventId: string, rows: any[]) 
         skipCount++;
       } else {
         successCount++;
+        
+        // Send email via Resend
+        if (eventData) {
+          const eventDateString = eventData.date_start 
+            ? new Date(eventData.date_start).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium' })
+            : 'TBA';
+            
+          sendRegistrationEmail({
+            to: email,
+            name: name || email.split('@')[0],
+            eventTitle: eventData.title || 'Event',
+            eventDate: eventDateString,
+            eventLocation: eventData.location || '',
+            status: 'confirmed',
+            hashPayload: hashPayload,
+            isTeam: !!teamName,
+            teamName: teamName || undefined
+          }).catch(err => console.error(`Failed to send import confirmation email to ${email}:`, err));
+        }
       }
 
     } catch (err: any) {
@@ -286,3 +314,86 @@ export async function updateEventDetails(eventId: string, updateData: any) {
   await logAudit('UPDATE_EVENT', { event_id: eventId, title: updateData.title })
   return { success: true }
 }
+
+export async function syncOfflineCheckins(eventId: string, checkins: Array<{
+  hash: string;
+  type: 'PRIMARY' | 'MEMBER';
+  memberIndex?: number;
+}>) {
+  const supabase = await createClient()
+
+  // Verify access
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) return { error: 'Unauthorized' }
+
+  const { data: profile } = await supabase
+    .from('member_profiles')
+    .select('role')
+    .eq('id', session.user.id)
+    .single()
+
+  if (!profile || (profile.role !== 'admin' && profile.role !== 'core_member')) {
+    return { error: 'Unauthorized' }
+  }
+
+  let successCount = 0;
+  const errors: string[] = [];
+
+  for (const checkin of checkins) {
+    try {
+      if (checkin.type === 'PRIMARY') {
+        const { error } = await supabase
+          .from('registrations')
+          .update({ checked_in: true })
+          .eq('hash_payload', checkin.hash)
+          .eq('event_id', eventId);
+          
+        if (error) {
+          errors.push(`Failed to check in primary ${checkin.hash}: ${error.message}`);
+        } else {
+          successCount++;
+          await logAudit('SCAN_TICKET', { hash: checkin.hash, event_id: eventId });
+        }
+      } else if (checkin.type === 'MEMBER' && typeof checkin.memberIndex === 'number') {
+        // Fetch latest team_data
+        const { data: reg, error: fetchError } = await supabase
+          .from('registrations')
+          .select('team_data')
+          .eq('hash_payload', checkin.hash)
+          .eq('event_id', eventId)
+          .single();
+
+        if (fetchError || !reg) {
+          errors.push(`Failed to fetch registration for member checkin: ${fetchError?.message}`);
+          continue;
+        }
+
+        const teamData = { ...reg.team_data };
+        if (teamData && teamData.members && teamData.members[checkin.memberIndex]) {
+          teamData.members[checkin.memberIndex].checked_in = true;
+          
+          const { error: updateError } = await supabase
+            .from('registrations')
+            .update({ team_data: teamData })
+            .eq('hash_payload', checkin.hash)
+            .eq('event_id', eventId);
+
+          if (updateError) {
+            errors.push(`Failed to check in member index ${checkin.memberIndex} of ${checkin.hash}: ${updateError.message}`);
+          } else {
+            successCount++;
+            await logAudit('SCAN_TICKET_MEMBER', { hash: checkin.hash, member_index: checkin.memberIndex, event_id: eventId });
+          }
+        } else {
+          errors.push(`Invalid member index ${checkin.memberIndex} for ${checkin.hash}`);
+        }
+      }
+    } catch (e: any) {
+      errors.push(`System exception checking in ${checkin.hash}: ${e.message}`);
+    }
+  }
+
+  revalidatePath(`/admin/events/${eventId}`)
+  return { success: true, successCount, errors };
+}
+

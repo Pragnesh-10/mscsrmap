@@ -1,6 +1,8 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
+import { decrypt } from '@/utils/security'
+import { logAudit } from './audit_actions'
 
 export async function acceptPasswordRequest(requestId: string, email: string, newPassword: string) {
   const supabase = await createClient()
@@ -28,10 +30,13 @@ export async function acceptPasswordRequest(requestId: string, email: string, ne
     return { error: 'User not found for this email address.' }
   }
 
+  // Decrypt the stored password securely
+  const decryptedPassword = decrypt(newPassword)
+
   // 3. Call the secure RPC to change the password
   const { error: rpcError } = await supabase.rpc('admin_change_password', {
     target_user_id: targetUser.id,
-    new_password: newPassword
+    new_password: decryptedPassword
   })
 
   if (rpcError) {
@@ -47,6 +52,9 @@ export async function acceptPasswordRequest(requestId: string, email: string, ne
   if (updateError) {
     return { error: 'Password was changed, but failed to update request status.' }
   }
+
+  // Audit log this sensitive action
+  await logAudit('ACCEPT_PASSWORD_RESET', { request_id: requestId, email })
 
   return { success: true }
 }
@@ -73,5 +81,9 @@ export async function rejectPasswordRequest(requestId: string) {
     .eq('id', requestId)
 
   if (error) return { error: error.message }
+
+  // Audit log rejection
+  await logAudit('REJECT_PASSWORD_RESET', { request_id: requestId })
+
   return { success: true }
 }

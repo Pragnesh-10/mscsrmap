@@ -20,6 +20,12 @@ export default function EventCard({ event, isPast }: { event: any, isPast: boole
         <h4>{event.title}</h4>
         <p>{event.description}</p>
         <div className="event-details">
+          {event.type && (event.type === 'hackathon' || event.type === 'workshop') && (
+            <span className="event-type font-semibold capitalize flex items-center gap-1.5">
+              <i className={event.type === 'hackathon' ? 'fa-solid fa-code text-purple-400' : 'fa-solid fa-chalkboard-user text-blue-400'}></i>
+              <span className={event.type === 'hackathon' ? 'text-purple-400' : 'text-blue-400'}>{event.type}</span>
+            </span>
+          )}
           <span className="event-time">
             <i className="fas fa-clock"></i> {event.status === 'completed' ? 'Completed' : 'Upcoming'}
           </span>

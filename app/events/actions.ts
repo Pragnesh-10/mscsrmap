@@ -3,14 +3,32 @@
 import { createAdminClient } from '@/utils/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import crypto from 'crypto'
+import { sendRegistrationEmail } from '@/utils/resend'
+import { sanitizeObject, sanitizeString, validateEmail } from '@/utils/security'
 
 export async function submitPublicRegistration(eventId: string, formData: any) {
+  // Sanitize all inputs to prevent XSS/Injection
+  eventId = sanitizeString(eventId)
+  formData = sanitizeObject(formData)
+
   const supabase = createAdminClient()
 
   const leadEmail = formData.email?.toLowerCase().trim()
 
-  if (!leadEmail) {
-    return { error: 'Email is required to register.' }
+  if (!leadEmail || !validateEmail(leadEmail)) {
+    return { error: 'A valid email is required to register.' }
+  }
+
+  // Validate all team member emails
+  if (formData.teamMembers && Array.isArray(formData.teamMembers)) {
+    for (const member of formData.teamMembers) {
+      if (member.email) {
+        member.email = member.email.toLowerCase().trim()
+        if (!validateEmail(member.email)) {
+          return { error: `Invalid email address format for team member: ${member.fullName || member.email}` }
+        }
+      }
+    }
   }
 
   // 1. Separate form_data and team_data
@@ -29,7 +47,7 @@ export async function submitPublicRegistration(eventId: string, formData: any) {
   // 3. Fetch Event Requirements for Backend Domain Validation
   const { data: eventData, error: eventError } = await supabase
     .from('events')
-    .select('form_requirements, max_capacity')
+    .select('title, date_start, location, form_requirements, max_capacity')
     .eq('id', eventId)
     .single()
 
@@ -146,6 +164,45 @@ export async function submitPublicRegistration(eventId: string, formData: any) {
     if (newTeam) createdTeamId = newTeam.id
   }
 
+  // Send email confirmations asynchronously via Resend
+  const eventDateString = eventData.date_start 
+    ? new Date(eventData.date_start).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium' })
+    : 'TBA';
+
+  // Send to lead registrant
+  sendRegistrationEmail({
+    to: leadEmail,
+    name: baseFormData.fullName || 'Participant',
+    eventTitle: eventData.title || 'Event',
+    eventDate: eventDateString,
+    eventLocation: eventData.location || '',
+    status: assignedStatus,
+    hashPayload: hashPayload,
+    isTeam: teamMembers.length > 0,
+    teamName: formData.teamName,
+    teamMembers: teamMembers
+  }).catch(err => console.error('Failed to send registration email to lead:', err));
+
+  // Send to all team members
+  if (teamMembers && teamMembers.length > 0) {
+    teamMembers.forEach((member: any) => {
+      if (member.email) {
+        sendRegistrationEmail({
+          to: member.email.toLowerCase().trim(),
+          name: member.fullName || 'Participant',
+          eventTitle: eventData.title || 'Event',
+          eventDate: eventDateString,
+          eventLocation: eventData.location || '',
+          status: assignedStatus,
+          hashPayload: hashPayload,
+          isTeam: true,
+          teamName: formData.teamName,
+          teamMembers: teamMembers
+        }).catch(err => console.error(`Failed to send registration email to member (${member.email}):`, err));
+      }
+    });
+  }
+
   // 8. Revalidate cache so the UI updates
   revalidatePath('/events', 'layout')
 
@@ -159,6 +216,13 @@ export async function submitPublicRegistration(eventId: string, formData: any) {
 }
 
 export async function lookupTeamRegistration(eventId: string, email: string) {
+  eventId = sanitizeString(eventId)
+  email = sanitizeString(email).toLowerCase().trim()
+
+  if (!email || !validateEmail(email)) {
+    return { error: 'A valid email is required to look up registration.' }
+  }
+
   const supabase = createAdminClient()
 
   // First check if they are the primary registrant
@@ -166,7 +230,7 @@ export async function lookupTeamRegistration(eventId: string, email: string) {
     .from('registrations')
     .select('*')
     .eq('event_id', eventId)
-    .eq('lead_email', email.toLowerCase().trim())
+    .eq('lead_email', email)
     .single()
 
   if (primaryReg) {
@@ -195,6 +259,15 @@ export async function lookupTeamRegistration(eventId: string, email: string) {
 }
 
 export async function joinMatchmakingTeam(teamId: string, memberData: any) {
+  teamId = sanitizeString(teamId)
+  memberData = sanitizeObject(memberData)
+
+  const email = memberData.email?.toLowerCase().trim()
+  if (!email || !validateEmail(email)) {
+    return { error: 'A valid email is required to join a team.' }
+  }
+  memberData.email = email
+
   const supabase = createAdminClient()
 
   // 1. Fetch the matchmaking team to get the registration link
@@ -211,7 +284,14 @@ export async function joinMatchmakingTeam(teamId: string, memberData: any) {
   // 2. Fetch the actual registration data
   const { data: reg, error: regError } = await supabase
     .from('registrations')
-    .select('id, team_data, hash_payload')
+    .select(`
+      id,
+      status,
+      team_data,
+      hash_payload,
+      event_id,
+      events ( title, date_start, location )
+    `)
     .eq('id', team.registration_id)
     .single()
 
@@ -250,6 +330,27 @@ export async function joinMatchmakingTeam(teamId: string, memberData: any) {
   // 9. If the team is now full, close the matchmaking slot
   if (newMembers.length + 1 >= team.max_team_size) {
     await supabase.from('teams').update({ looking_for_members: false }).eq('id', teamId)
+  }
+
+  // Send email confirmation to the joining member asynchronously
+  const event = reg.events as any;
+  if (event) {
+    const eventDateString = event.date_start 
+      ? new Date(event.date_start).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium' })
+      : 'TBA';
+
+    sendRegistrationEmail({
+      to: memberData.email.toLowerCase().trim(),
+      name: memberData.fullName || 'Participant',
+      eventTitle: event.title || 'Event',
+      eventDate: eventDateString,
+      eventLocation: event.location || '',
+      status: reg.status || 'confirmed',
+      hashPayload: reg.hash_payload,
+      isTeam: true,
+      teamName: reg.team_data?.teamName || '',
+      teamMembers: newMembers
+    }).catch(err => console.error(`Failed to send join confirmation email to ${memberData.email}:`, err));
   }
 
   revalidatePath('/events', 'layout')

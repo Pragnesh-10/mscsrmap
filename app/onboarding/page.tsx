@@ -68,11 +68,14 @@ export default function OnboardingPage() {
               className="w-full p-3 bg-black/50 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#0078d4] transition-colors appearance-none"
             >
               <option value="" disabled>Select your department...</option>
-              <option value="CSE">Computer Science and Engineering</option>
-              <option value="ECE">Electronics and Communication</option>
-              <option value="MECH">Mechanical Engineering</option>
-              <option value="BBA">Business Administration</option>
-              <option value="OTHER">Other</option>
+              <option value="CSE">CSE</option>
+              <option value="ECE">ECE</option>
+              <option value="EEE">EEE</option>
+              <option value="BSc">BSc</option>
+              <option value="BBA">BBA</option>
+              <option value="MBA">MBA</option>
+              <option value="Mechanical">Mechanical</option>
+              <option value="others">others</option>
             </select>
           </div>
 
@@ -84,11 +87,11 @@ export default function OnboardingPage() {
               defaultValue=""
               className="w-full p-3 bg-black/50 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#0078d4] transition-colors appearance-none"
             >
-              <option value="" disabled>Select your year...</option>
-              <option value="1">1st Year</option>
-              <option value="2">2nd Year</option>
-              <option value="3">3rd Year</option>
-              <option value="4">4th Year</option>
+              <option value="" disabled>Select Year</option>
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
             </select>
           </div>
 

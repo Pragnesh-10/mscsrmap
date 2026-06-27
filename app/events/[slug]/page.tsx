@@ -90,9 +90,20 @@ export default async function EventPage(props: {
             )}
             <div className="p-8 md:p-12 relative z-10">
               <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4 mb-6">
-                <h1 className="text-4xl md:text-5xl font-extrabold text-white leading-tight">
-                  {evt.title}
-                </h1>
+                <div className="flex flex-col gap-2">
+                  {evt.type && (evt.type === 'hackathon' || evt.type === 'workshop') && (
+                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider w-fit ${
+                      evt.type === 'hackathon' 
+                        ? 'bg-purple-500/15 text-purple-400 border border-purple-500/30' 
+                        : 'bg-blue-500/15 text-blue-400 border border-blue-500/30'
+                    }`}>
+                      {evt.type}
+                    </span>
+                  )}
+                  <h1 className="text-4xl md:text-5xl font-extrabold text-white leading-tight">
+                    {evt.title}
+                  </h1>
+                </div>
                 <span className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider whitespace-nowrap self-start ${
                   evt.status === 'upcoming' 
                     ? 'bg-green-500/15 text-green-400 border border-green-500/30'

@@ -21,11 +21,12 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
 
   if (!profile || profile.role !== 'admin') return notFound()
 
-  // Fetch Event
+  // Fetch Event by slug or ID fallback
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
   const { data: event, error: eventError } = await supabase
     .from('events')
     .select('*')
-    .eq('id', id)
+    .or(`slug.eq.${id}${isUUID ? `,id.eq.${id}` : ''}`)
     .single()
 
   if (eventError || !event) return notFound()
@@ -36,7 +37,7 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
         <div className="absolute top-[-100px] right-[-100px] w-[400px] h-[400px] rounded-full bg-blue-500/15 blur-[100px] z-0 pointer-events-none"></div>
         
         <div className="relative z-10 max-w-6xl mx-auto">
-          <Link href={`/admin/events/${id}`} className="text-white/40 hover:text-white transition-colors flex items-center gap-2 text-sm font-semibold mb-8">
+          <Link href={`/admin/events/${event.slug || id}`} className="text-white/40 hover:text-white transition-colors flex items-center gap-2 text-sm font-semibold mb-8">
             <i className="fas fa-arrow-left"></i> Back to Event Details
           </Link>
 
