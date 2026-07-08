@@ -26,7 +26,6 @@ const AnalyticsDashboard = dynamic(() => import('./AnalyticsDashboard'), {
 })
 
 import SettingsTab from './SettingsTab'
-import AboutTab from './AboutTab'
 import PasswordRequestsTab from './PasswordRequestsTab'
 import { logAudit, fetchAuditLogs } from './audit_actions'
 
@@ -58,7 +57,7 @@ export const triggerHaptic = (type: 'light' | 'medium' | 'heavy' | 'success' | '
 }
 
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState<'users' | 'events' | 'team' | 'analytics' | 'settings' | 'about' | 'password_reqs' | 'audit'>('events')
+  const [activeTab, setActiveTab] = useState<'users' | 'events' | 'team' | 'analytics' | 'settings' | 'password_reqs' | 'audit'>('events')
   const supabase = createClient()
 
   const [userRole, setUserRole] = useState<'admin' | 'core_member' | null>(null)
@@ -68,6 +67,7 @@ export default function AdminPage() {
   const [loadingUsers, setLoadingUsers] = useState(true)
   const [loadingEvents, setLoadingEvents] = useState(true)
   const [loadingTeam, setLoadingTeam] = useState(true)
+  const [editingTeamMember, setEditingTeamMember] = useState<any>(null)
   const [auditLogs, setAuditLogs] = useState<any[]>([])
   const [loadingAudit, setLoadingAudit] = useState(true)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
@@ -429,6 +429,10 @@ export default function AdminPage() {
     const role = formData.get('role') as string
     const linkedin_url = formData.get('linkedin_url') as string
     const github_url = formData.get('github_url') as string
+    const twitter_url = formData.get('twitter_url') as string
+    const instagram_url = formData.get('instagram_url') as string
+    const email = formData.get('email') as string
+    const portfolio_url = formData.get('portfolio_url') as string
     const imageFile = formData.get('image') as File
 
     showStatus('create_team', 'Uploading and saving...', 'info')
@@ -443,13 +447,53 @@ export default function AdminPage() {
       }
     }
 
-    const { error } = await supabase.from('team_members').insert([{ name, role, linkedin_url, github_url, image_url, category: 'team' }])
-    
+    const payload = { name, role, linkedin_url, github_url, twitter_url, instagram_url, email, portfolio_url, image_url, category: 'team' }
+
+    const { error } = await supabase.from('team_members').insert([payload])
     if (error) {
       showStatus('create_team', `Failed: ${error.message}`, 'error')
     } else {
       showStatus('create_team', 'Team Member Created Successfully!', 'success')
       ;(e.target as HTMLFormElement).reset()
+      fetchTeam()
+    }
+  }
+
+  async function handleUpdateTeam(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    if (!editingTeamMember) return
+
+    const formData = new FormData(e.currentTarget)
+    const name = formData.get('name') as string
+    const role = formData.get('role') as string
+    const linkedin_url = formData.get('linkedin_url') as string
+    const github_url = formData.get('github_url') as string
+    const twitter_url = formData.get('twitter_url') as string
+    const instagram_url = formData.get('instagram_url') as string
+    const email = formData.get('email') as string
+    const portfolio_url = formData.get('portfolio_url') as string
+    const imageFile = formData.get('image') as File
+
+    showStatus('update_team', 'Uploading and updating...', 'info')
+    
+    let image_url = editingTeamMember.image_url || ''
+    if (imageFile && imageFile.size > 0) {
+      try {
+        image_url = await uploadImage(imageFile, 'team')
+      } catch (err: any) {
+        showStatus('update_team', `Upload Failed: ${err.message}`, 'error')
+        return
+      }
+    }
+
+    const payload = { name, role, linkedin_url, github_url, twitter_url, instagram_url, email, portfolio_url, image_url, category: 'team' }
+
+    const { error } = await supabase.from('team_members').update(payload).eq('id', editingTeamMember.id)
+    if (error) {
+      showStatus('update_team', `Failed: ${error.message}`, 'error')
+    } else {
+      showStatus('update_team', 'Team Member Updated Successfully!', 'success')
+      setEditingTeamMember(null)
       fetchTeam()
     }
   }
@@ -610,16 +654,6 @@ export default function AdminPage() {
                 }`}
               >
                 <i className="fas fa-cog w-4 text-blue-400/85"></i> Settings
-              </button>
-              <button 
-                onClick={() => { triggerHaptic('light'); setActiveTab('about'); setIsMobileMenuOpen(false); }} 
-                className={`px-4 py-2.5 rounded-xl font-semibold text-xs transition-all text-left flex items-center gap-3 relative border ${
-                  activeTab === 'about' 
-                    ? 'bg-white/5 border-white/10 text-white shadow-[inset_0_1px_rgba(255,255,255,0.05),0_10px_20px_rgba(0,0,0,0.4)] before:absolute before:left-0 before:top-2 before:bottom-2 before:w-1 before:bg-teal-500 before:rounded-full' 
-                    : 'text-[#a1a1aa] hover:text-white border-transparent hover:bg-white/[0.01]'
-                }`}
-              >
-                <i className="fas fa-info-circle w-4 text-teal-400/85"></i> About
               </button>
             </div>
           </div>
@@ -1024,6 +1058,25 @@ export default function AdminPage() {
                       </div>
                     </div>
 
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div className="flex flex-col gap-2">
+                        <label className="text-[11px] font-bold text-[#a1a1aa] uppercase tracking-wider">Twitter/X URL</label>
+                        <input type="url" name="twitter_url" placeholder="https://x.com/..." className="p-3 bg-black/40 border border-white/10 focus:border-blue-500/50 rounded-xl text-white outline-none transition-all placeholder:text-white/20" />
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <label className="text-[11px] font-bold text-[#a1a1aa] uppercase tracking-wider">Instagram URL</label>
+                        <input type="url" name="instagram_url" placeholder="https://instagram.com/..." className="p-3 bg-black/40 border border-white/10 focus:border-blue-500/50 rounded-xl text-white outline-none transition-all placeholder:text-white/20" />
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <label className="text-[11px] font-bold text-[#a1a1aa] uppercase tracking-wider">Email Address</label>
+                        <input type="email" name="email" placeholder="email@example.com" className="p-3 bg-black/40 border border-white/10 focus:border-blue-500/50 rounded-xl text-white outline-none transition-all placeholder:text-white/20" />
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <label className="text-[11px] font-bold text-[#a1a1aa] uppercase tracking-wider">Portfolio URL</label>
+                        <input type="url" name="portfolio_url" placeholder="https://yourwebsite.com" className="p-3 bg-black/40 border border-white/10 focus:border-blue-500/50 rounded-xl text-white outline-none transition-all placeholder:text-white/20" />
+                      </div>
+                    </div>
+
                     <div className="flex flex-col gap-2 bg-white/[0.02] border border-white/5 p-4 rounded-xl">
                       <label className="text-[11px] font-bold text-[#a1a1aa] uppercase tracking-wider">Profile Picture (Upload)</label>
                       <input type="file" name="image" accept="image/*" className="w-full text-sm text-white file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-white/10 file:text-white hover:file:bg-white/20 transition-all cursor-pointer" />
@@ -1086,12 +1139,92 @@ export default function AdminPage() {
                       </div>
                       
                       {userRole === 'admin' && (
-                        <button onClick={() => { triggerHaptic('heavy'); deleteTeam(member.id); }} className="w-full py-2 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/20 hover:border-transparent rounded-xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer">
-                          Remove Member
-                        </button>
+                        <div className="flex gap-2 w-full mt-2">
+                          <button onClick={() => { triggerHaptic('light'); setEditingTeamMember(member); }} className="flex-1 py-2 bg-blue-500/10 hover:bg-blue-500 text-blue-500 hover:text-white border border-blue-500/20 hover:border-transparent rounded-xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer">
+                            Edit
+                          </button>
+                          <button onClick={() => { triggerHaptic('heavy'); deleteTeam(member.id); }} className="flex-1 py-2 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/20 hover:border-transparent rounded-xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer">
+                            Remove
+                          </button>
+                        </div>
                       )}
                     </div>
                   ))}
+                </div>
+              )}
+
+              {/* Edit Team Member Modal */}
+              {editingTeamMember && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+                  <div className="bg-[#18181b] border border-white/10 rounded-2xl p-6 w-full max-w-3xl shadow-2xl overflow-y-auto max-h-[90vh]">
+                    <div className="flex justify-between items-center mb-6">
+                      <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                        <i className="fas fa-user-edit text-blue-400"></i> Edit Team Member
+                      </h3>
+                      <button onClick={() => setEditingTeamMember(null)} className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition-all cursor-pointer">
+                        <i className="fas fa-times"></i>
+                      </button>
+                    </div>
+                    
+                    <form key={editingTeamMember.id} onSubmit={handleUpdateTeam} className="flex flex-col gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="flex flex-col gap-2">
+                          <label className="text-[11px] font-bold text-[#a1a1aa] uppercase tracking-wider">Full Name</label>
+                          <input type="text" name="name" required defaultValue={editingTeamMember.name} placeholder="e.g. John Doe" className="p-3 bg-black/40 border border-white/10 focus:border-blue-500/50 rounded-xl text-white outline-none transition-all placeholder:text-white/20" />
+                        </div>
+                        <div className="flex flex-col gap-2">
+                          <label className="text-[11px] font-bold text-[#a1a1aa] uppercase tracking-wider">Role</label>
+                          <input type="text" name="role" required defaultValue={editingTeamMember.role} placeholder="e.g. Technical Lead" className="p-3 bg-black/40 border border-white/10 focus:border-blue-500/50 rounded-xl text-white outline-none transition-all placeholder:text-white/20" />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="flex flex-col gap-2">
+                          <label className="text-[11px] font-bold text-[#a1a1aa] uppercase tracking-wider">LinkedIn URL</label>
+                          <input type="url" name="linkedin_url" defaultValue={editingTeamMember.linkedin_url} placeholder="https://www.linkedin.com/in/..." className="p-3 bg-black/40 border border-white/10 focus:border-blue-500/50 rounded-xl text-white outline-none transition-all placeholder:text-white/20" />
+                        </div>
+                        <div className="flex flex-col gap-2">
+                          <label className="text-[11px] font-bold text-[#a1a1aa] uppercase tracking-wider">GitHub URL</label>
+                          <input type="url" name="github_url" defaultValue={editingTeamMember.github_url} placeholder="https://github.com/..." className="p-3 bg-black/40 border border-white/10 focus:border-blue-500/50 rounded-xl text-white outline-none transition-all placeholder:text-white/20" />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div className="flex flex-col gap-2">
+                          <label className="text-[11px] font-bold text-[#a1a1aa] uppercase tracking-wider">Twitter/X URL</label>
+                          <input type="url" name="twitter_url" defaultValue={editingTeamMember.twitter_url} placeholder="https://x.com/..." className="p-3 bg-black/40 border border-white/10 focus:border-blue-500/50 rounded-xl text-white outline-none transition-all placeholder:text-white/20" />
+                        </div>
+                        <div className="flex flex-col gap-2">
+                          <label className="text-[11px] font-bold text-[#a1a1aa] uppercase tracking-wider">Instagram URL</label>
+                          <input type="url" name="instagram_url" defaultValue={editingTeamMember.instagram_url} placeholder="https://instagram.com/..." className="p-3 bg-black/40 border border-white/10 focus:border-blue-500/50 rounded-xl text-white outline-none transition-all placeholder:text-white/20" />
+                        </div>
+                        <div className="flex flex-col gap-2">
+                          <label className="text-[11px] font-bold text-[#a1a1aa] uppercase tracking-wider">Email Address</label>
+                          <input type="email" name="email" defaultValue={editingTeamMember.email} placeholder="email@example.com" className="p-3 bg-black/40 border border-white/10 focus:border-blue-500/50 rounded-xl text-white outline-none transition-all placeholder:text-white/20" />
+                        </div>
+                        <div className="flex flex-col gap-2">
+                          <label className="text-[11px] font-bold text-[#a1a1aa] uppercase tracking-wider">Portfolio URL</label>
+                          <input type="url" name="portfolio_url" defaultValue={editingTeamMember.portfolio_url} placeholder="https://yourwebsite.com" className="p-3 bg-black/40 border border-white/10 focus:border-blue-500/50 rounded-xl text-white outline-none transition-all placeholder:text-white/20" />
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-2 bg-white/[0.02] border border-white/5 p-4 rounded-xl">
+                        <label className="text-[11px] font-bold text-[#a1a1aa] uppercase tracking-wider">Profile Picture (Upload)</label>
+                        <p className="text-xs text-white/50 mb-2">Leave blank to keep current picture</p>
+                        <input type="file" name="image" accept="image/*" className="w-full text-sm text-white file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-white/10 file:text-white hover:file:bg-white/20 transition-all cursor-pointer" />
+                      </div>
+
+                      <div className="flex justify-between items-center mt-6">
+                        <div className={`text-xs font-semibold ${statusMsg?.type === 'error' ? 'text-red-400' : statusMsg?.type === 'success' ? 'text-green-400' : 'text-blue-400'}`}>
+                          {statusMsg?.id === 'update_team' && statusMsg.msg}
+                        </div>
+                        <div className="flex gap-4">
+                          <button type="button" onClick={() => setEditingTeamMember(null)} className="px-6 py-3 bg-white/5 hover:bg-white/10 rounded-xl font-bold transition-all text-white/70">Cancel</button>
+                          <button type="submit" className="px-8 py-3 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 rounded-xl font-bold transition-all shadow-[0_0_20px_rgba(59,130,246,0.2)] text-white">Save Changes</button>
+                        </div>
+                      </div>
+                    </form>
+                  </div>
                 </div>
               )}
             </div>
@@ -1108,9 +1241,14 @@ export default function AdminPage() {
                   <h2 className="text-3xl font-syne font-extrabold text-white tracking-tight">Security Audit Logs</h2>
                   <p className="text-white/40 text-sm mt-1">Immutable record of admin actions taken on the system.</p>
                 </div>
-                <button onClick={() => { triggerHaptic('light'); fetchAuditLogsData(); }} className="self-start sm:self-center px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-xl text-xs font-bold text-white transition-all flex items-center gap-2 cursor-pointer">
-                  <i className="fas fa-sync-alt"></i> Refresh Logs
-                </button>
+                <div className="flex gap-2 self-start sm:self-center">
+                  <button onClick={() => { triggerHaptic('light'); setAuditLogs([]); }} className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/30 text-red-400 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer">
+                    <i className="fas fa-trash-alt"></i> Clear Logs
+                  </button>
+                  <button onClick={() => { triggerHaptic('light'); fetchAuditLogsData(); }} className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-xl text-xs font-bold text-white transition-all flex items-center gap-2 cursor-pointer">
+                    <i className="fas fa-sync-alt"></i> Refresh Logs
+                  </button>
+                </div>
               </div>
 
               <div className="bg-[#18181b]/30 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden shadow-xl">
@@ -1170,7 +1308,6 @@ export default function AdminPage() {
           {activeTab === 'settings' && <SettingsTab />}
 
           {/* ABOUT TAB */}
-          {activeTab === 'about' && <AboutTab />}
         </div>
       </main>
 
@@ -1249,6 +1386,7 @@ export default function AdminPage() {
           </div>
         </div>
       )}
+
     </div>
   )
 }

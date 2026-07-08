@@ -21,8 +21,10 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
 
   if (!profile || profile.role !== 'admin') return notFound()
 
+  const decodedId = decodeURIComponent(id)
+  
   // Fetch Event by slug or ID fallback
-  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(decodedId)
   const { data: event, error: eventError } = await supabase
     .from('events')
     .select('*')

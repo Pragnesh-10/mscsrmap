@@ -2,20 +2,15 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
-import { 
-  AreaChart, 
-  Area, 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer, 
-  PieChart, 
-  Pie, 
-  Cell 
-} from 'recharts'
+
+type EventStat = {
+  title: string
+  teamsRegistered: number
+  individualsRegistered: number
+  totalMembers: number
+  checkedInMembers: number
+  checkinRate: number
+}
 
 export default function AnalyticsDashboard() {
   const supabase = createClient()
@@ -27,11 +22,7 @@ export default function AnalyticsDashboard() {
     totalParticipants: 0,
     checkInRate: 0,
   })
-  const [registrationData, setRegistrationData] = useState<any[]>([])
-  const [departmentData, setDepartmentData] = useState<any[]>([])
-  const [eventData, setEventData] = useState<any[]>([])
-
-  const COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#6366f1']
+  const [eventStats, setEventStats] = useState<EventStat[]>([])
 
   useEffect(() => {
     fetchAnalytics()
@@ -56,9 +47,7 @@ export default function AnalyticsDashboard() {
       let totalParticipantsCount = 0
       let checkedInCount = 0
 
-      const dateMap: Record<string, number> = {}
-      const deptMap: Record<string, number> = {}
-      const eventMap: Record<string, number> = {}
+      const eventMap: Record<string, EventStat> = {}
 
       if (regs) {
         regs.forEach(reg => {
@@ -72,26 +61,29 @@ export default function AnalyticsDashboard() {
             checkedInCount += attendeeCount
           }
 
-          // 2. Timeline Aggregation (group by sorted date keys: YYYY-MM-DD)
-          const dateObj = new Date(reg.created_at)
-          const year = dateObj.getFullYear()
-          const month = String(dateObj.getMonth() + 1).padStart(2, '0')
-          const day = String(dateObj.getDate()).padStart(2, '0')
-          const dateKey = `${year}-${month}-${day}`
-          dateMap[dateKey] = (dateMap[dateKey] || 0) + attendeeCount
-
-          // 3. Department Demographics (include team members for accuracy)
-          const leadBranch = (reg.form_data as any)?.branch || 'Other'
-          deptMap[leadBranch] = (deptMap[leadBranch] || 0) + 1
-
-          teamMembers.forEach(member => {
-            const memberBranch = member.branch || 'Other'
-            deptMap[memberBranch] = (deptMap[memberBranch] || 0) + 1
-          })
-
-          // 4. Event popularity metrics
+          // Per-event aggregation
           const eventTitle = (reg.events as any)?.title || 'Unknown Event'
-          eventMap[eventTitle] = (eventMap[eventTitle] || 0) + attendeeCount
+          if (!eventMap[eventTitle]) {
+            eventMap[eventTitle] = {
+              title: eventTitle,
+              teamsRegistered: 0,
+              individualsRegistered: 0,
+              totalMembers: 0,
+              checkedInMembers: 0,
+              checkinRate: 0
+            }
+          }
+
+          if (isTeam) {
+            eventMap[eventTitle].teamsRegistered += 1
+          } else {
+            eventMap[eventTitle].individualsRegistered += 1
+          }
+
+          eventMap[eventTitle].totalMembers += attendeeCount
+          if (reg.checked_in) {
+            eventMap[eventTitle].checkedInMembers += attendeeCount
+          }
         })
       }
 
@@ -105,39 +97,12 @@ export default function AnalyticsDashboard() {
         checkInRate: rate
       })
 
-      // Convert timeline map to chronologically sorted array
-      const timelineArray = Object.keys(dateMap)
-        .sort()
-        .map(dateKey => {
-          const [y, m, d] = dateKey.split('-')
-          const formattedDate = new Date(Number(y), Number(m) - 1, Number(d)).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-          return {
-            date: formattedDate,
-            participants: dateMap[dateKey]
-          }
-        })
+      const eventStatsArray = Object.values(eventMap).map(stat => ({
+        ...stat,
+        checkinRate: stat.totalMembers > 0 ? Math.round((stat.checkedInMembers / stat.totalMembers) * 100) : 0
+      })).sort((a, b) => b.totalMembers - a.totalMembers)
 
-      // Convert department map to sorted array
-      const deptArray = Object.keys(deptMap)
-        .map(name => ({
-          name: name.toUpperCase().trim(),
-          value: deptMap[name]
-        }))
-        .sort((a, b) => b.value - a.value)
-        .slice(0, 6)
-
-      // Convert event popularity map to sorted array
-      const eventArray = Object.keys(eventMap)
-        .map(title => ({
-          title,
-          participants: eventMap[title]
-        }))
-        .sort((a, b) => b.participants - a.participants)
-        .slice(0, 5)
-
-      setRegistrationData(timelineArray)
-      setDepartmentData(deptArray)
-      setEventData(eventArray)
+      setEventStats(eventStatsArray)
 
     } catch (error) {
       console.error('Failed to parse analytics metrics:', error)
@@ -224,90 +189,51 @@ export default function AnalyticsDashboard() {
         </div>
       </div>
 
-      {/* Main Timeline Chart */}
-      <div className="bg-[#18181b]/30 backdrop-blur-md border border-white/10 rounded-2xl p-6 shadow-lg">
-        <h3 className="text-base font-bold text-white mb-6 flex items-center gap-2">
-          <i className="fas fa-chart-line text-blue-400"></i> Participant Registration Velocity
-        </h3>
-        <div className="h-72">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={registrationData}>
-              <defs>
-                <linearGradient id="registrationVelocity" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
-                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.015)" vertical={false} />
-              <XAxis dataKey="date" stroke="rgba(255,255,255,0.12)" tick={{fill: 'rgba(255,255,255,0.4)', fontSize: 10}} />
-              <YAxis stroke="rgba(255,255,255,0.12)" tick={{fill: 'rgba(255,255,255,0.4)', fontSize: 10}} allowDecimals={false} />
-              <Tooltip 
-                contentStyle={{ backgroundColor: '#09090b', borderColor: 'rgba(255,255,255,0.08)', borderRadius: '14px', color: 'white', backdropFilter: 'blur(10px)' }}
-                itemStyle={{ color: '#3b82f6', fontWeight: 'bold' }}
-              />
-              <Area type="monotone" dataKey="participants" name="Participants" stroke="#3b82f6" strokeWidth={2.5} fillOpacity={1} fill="url(#registrationVelocity)" dot={{ r: 3, fill: '#09090b', strokeWidth: 1.5, stroke: '#3b82f6' }} activeDot={{ r: 5, strokeWidth: 0, fill: '#60a5fa' }} />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* Split Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Event Popularity */}
-        <div className="bg-[#18181b]/30 backdrop-blur-md border border-white/10 rounded-2xl p-6 shadow-lg">
-          <h3 className="text-base font-bold text-white mb-6 flex items-center gap-2">
-            <i className="fas fa-fire text-amber-400"></i> Event Popularity (Top 5)
+      {/* Event Analytics Table */}
+      <div className="bg-[#18181b]/30 backdrop-blur-md border border-white/10 rounded-[22px] overflow-hidden shadow-lg mt-8">
+        <div className="p-6 border-b border-white/10">
+          <h3 className="text-xl font-bold text-white flex items-center gap-2">
+            <i className="fas fa-list-alt text-blue-400"></i> Event Analytics
           </h3>
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={eventData} layout="vertical" margin={{ left: 10, right: 30 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" horizontal={false} />
-                <XAxis type="number" stroke="rgba(255,255,255,0.2)" tick={{fill: 'rgba(255,255,255,0.4)', fontSize: 11}} allowDecimals={false} />
-                <YAxis type="category" dataKey="title" stroke="rgba(255,255,255,0.2)" tick={{fill: 'rgba(255,255,255,0.5)', fontSize: 10}} width={100} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#18181b', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '16px', color: 'white', backdropFilter: 'blur(10px)' }}
-                  itemStyle={{ color: '#ec4899', fontWeight: 'bold' }}
-                />
-                <Bar dataKey="participants" name="Participants" fill="#ec4899" radius={[0, 8, 8, 0]} barSize={16}>
-                  {eventData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
         </div>
-
-        {/* Demographics */}
-        <div className="bg-[#18181b]/30 backdrop-blur-md border border-white/10 rounded-2xl p-6 shadow-lg">
-          <h3 className="text-base font-bold text-white mb-6 flex items-center gap-2">
-            <i className="fas fa-chart-pie text-purple-400"></i> Branch Demographics (Top 6)
-          </h3>
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={departmentData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={65}
-                  outerRadius={95}
-                  paddingAngle={4}
-                  dataKey="value"
-                  label={({name, percent}) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
-                  labelLine={{ stroke: 'rgba(255,255,255,0.15)' }}
-                >
-                  {departmentData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#18181b', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '16px', color: 'white', backdropFilter: 'blur(10px)' }}
-                  itemStyle={{ color: 'white', fontWeight: 'bold' }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-white/5 text-[#aaaaaa] text-sm uppercase tracking-wider">
+                <th className="p-4 font-semibold">Event</th>
+                <th className="p-4 font-semibold text-center">Individuals</th>
+                <th className="p-4 font-semibold text-center">Teams</th>
+                <th className="p-4 font-semibold text-center">Total Members</th>
+                <th className="p-4 font-semibold">Check-in Rate</th>
+              </tr>
+            </thead>
+            <tbody className="text-white text-sm divide-y divide-white/10">
+              {eventStats.map((stat, idx) => (
+                <tr key={idx} className="hover:bg-white/5 transition-colors">
+                  <td className="p-4 font-medium">{stat.title}</td>
+                  <td className="p-4 text-center">{stat.individualsRegistered}</td>
+                  <td className="p-4 text-center">{stat.teamsRegistered}</td>
+                  <td className="p-4 text-center">{stat.totalMembers}</td>
+                  <td className="p-4">
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-2 bg-white/10 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full rounded-full ${stat.checkinRate > 50 ? 'bg-green-500' : stat.checkinRate > 20 ? 'bg-yellow-500' : 'bg-red-500'}`} 
+                          style={{ width: `${stat.checkinRate}%` }}
+                        ></div>
+                      </div>
+                      <span className="text-xs font-bold w-9 text-right">{stat.checkinRate}%</span>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {eventStats.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="p-8 text-center text-[#aaaaaa]">No event data available</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

@@ -71,24 +71,57 @@ export default function RegistrationsTable({ registrations, eventTitle, eventId 
 
   const exportToCSV = () => {
     const rows = []
-    rows.push(['Ticket ID', 'Primary Email', 'Primary Name', 'Team Name', 'Team Size', 'Status', 'Registration Date'])
+    rows.push(['Ticket ID', 'Email', 'Name', 'Reg Num', 'Branch', 'Team Name', 'Team Size', 'Status', 'Registration Date'])
     
     registrations.forEach(reg => {
       const teamName = reg.team_data?.teamName || 'N/A'
       const teamSize = reg.team_data?.members ? reg.team_data.members.length + 1 : 1
-      const primaryName = reg.form_data?.fullName || 'N/A'
       const date = new Date(reg.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })
-      const status = reg.checked_in ? 'Checked In' : 'Pending'
+      const ticketId = reg.hash_payload.substring(0, 8)
+      
+      const exportedEmails = new Set()
+
+      // Primary member
+      const primaryEmail = reg.lead_email || 'N/A'
+      const primaryName = reg.form_data?.fullName || 'N/A'
+      const primaryRegNum = reg.form_data?.regNum || 'N/A'
+      const primaryBranch = reg.form_data?.branch || 'N/A'
+      const primaryStatus = reg.checked_in ? 'Checked In' : 'Pending'
       
       rows.push([
-        reg.hash_payload.substring(0, 8),
-        reg.lead_email,
+        ticketId,
+        primaryEmail,
         primaryName,
+        primaryRegNum,
+        primaryBranch,
         teamName,
         teamSize,
-        status,
+        primaryStatus,
         date
       ])
+      exportedEmails.add(primaryEmail.toLowerCase())
+
+      // Team members rows
+      if (reg.team_data?.members && Array.isArray(reg.team_data.members)) {
+        reg.team_data.members.forEach((member: any) => {
+          const email = member.email || 'N/A'
+          
+          if (!exportedEmails.has(email.toLowerCase())) {
+            rows.push([
+              ticketId,
+              email,
+              member.fullName || 'N/A',
+              member.regNum || 'N/A',
+              member.branch || 'N/A',
+              teamName,
+              teamSize,
+              member.checked_in ? 'Checked In' : 'Pending',
+              date
+            ])
+            exportedEmails.add(email.toLowerCase())
+          }
+        })
+      }
     })
 
     const csvContent = "data:text/csv;charset=utf-8," + rows.map(e => e.join(",")).join("\n")

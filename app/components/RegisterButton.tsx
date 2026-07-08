@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { QRCodeCanvas } from 'qrcode.react'
-import html2canvas from 'html2canvas'
+import { TicketTemplate } from './TicketTemplate'
 import { submitPublicRegistration } from '../events/actions'
 
 interface FormRequirements {
@@ -28,6 +28,8 @@ export default function RegisterButton({ eventId, eventTitle, isRegistrationOpen
   const [showTicketModal, setShowTicketModal] = useState(false)
   const [showWaitlistModal, setShowWaitlistModal] = useState(false)
   const [currentHash, setCurrentHash] = useState<string | null>(null)
+  const [userName, setUserName] = useState<string>('-')
+  const [userEmail, setUserEmail] = useState<string>('-')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
   
@@ -53,9 +55,17 @@ export default function RegisterButton({ eventId, eventTitle, isRegistrationOpen
     const formData = new FormData(e.currentTarget)
     
     // Build base form data for the primary user
+    const emailVal = formData.get('email') as string;
+    const nameVal = formData.get('fullName') as string;
+    const teamNameVal = formData.get('teamName') as string;
+    
+    setUserName(nameVal || '-');
+    setUserEmail(emailVal || '-');
+
     const baseData: any = {
-      email: formData.get('email'),
-      fullName: formData.get('fullName'),
+      email: emailVal,
+      fullName: nameVal,
+      teamName: teamNameVal,
     }
     if (reqs.req_reg_num) baseData.regNum = formData.get('regNum')
     if (reqs.req_branch) baseData.branch = formData.get('branch')
@@ -99,8 +109,8 @@ export default function RegisterButton({ eventId, eventTitle, isRegistrationOpen
   async function downloadTicket() {
     if (!ticketRef.current) return;
     try {
-      const canvas = await html2canvas(ticketRef.current, { backgroundColor: '#18181b', scale: 2 })
-      const dataUrl = canvas.toDataURL('image/png')
+      const htmlToImage = await import('html-to-image')
+      const dataUrl = await htmlToImage.toPng(ticketRef.current, { backgroundColor: '#18181b', pixelRatio: 2, style: { transform: 'scale(1)', transformOrigin: 'top left' } })
       const link = document.createElement('a')
       link.download = `Event-Ticket-${currentHash?.substring(0, 8)}.png`
       link.href = dataUrl
@@ -224,8 +234,8 @@ export default function RegisterButton({ eventId, eventTitle, isRegistrationOpen
                   {teamSize > 1 && (
                     <div className="flex flex-col gap-6 p-5 bg-white/5 rounded-xl border border-white/10 mb-6">
                       <div className="flex flex-col gap-2 mb-2 border-b border-white/10 pb-6">
-                        <label className="text-[13px] font-semibold text-blue-400 uppercase tracking-wider">Team Name</label>
-                        <input type="text" name="teamName" required placeholder="Enter a cool team name" className="p-3 bg-black/40 border border-blue-500/30 rounded-xl text-white focus:outline-none focus:border-blue-500 w-full mb-4" />
+                        <label className="text-[13px] font-semibold text-blue-400 uppercase tracking-wider">Team Name (Mandatory)</label>
+                        <input type="text" name="teamName" required placeholder="Enter your team name" className="p-3 bg-black/40 border border-blue-500/30 rounded-xl text-white focus:outline-none focus:border-blue-500 w-full mb-4" />
                         
                         <label className="text-[13px] font-semibold text-blue-400 uppercase tracking-wider">Who is the Team Lead?</label>
                         <select value={teamLeadIndex} onChange={(e) => setTeamLeadIndex(parseInt(e.target.value))} className="p-3 bg-black/40 border border-blue-500/30 rounded-xl text-white focus:outline-none focus:border-blue-500">
@@ -268,6 +278,7 @@ export default function RegisterButton({ eventId, eventTitle, isRegistrationOpen
                                   <option value="BBA">BBA</option>
                                   <option value="MBA">MBA</option>
                                   <option value="Mechanical">Mechanical</option>
+                                  <option value="Civil">Civil</option>
                                   <option value="others">others</option>
                                 </select>
                               </div>
@@ -313,8 +324,20 @@ export default function RegisterButton({ eventId, eventTitle, isRegistrationOpen
               <i className="fas fa-times text-2xl"></i>
             </button>
             
-            {/* Downloadable Ticket Section */}
-            <div ref={ticketRef} className="bg-[#18181b] border border-white/10 rounded-2xl p-8 flex flex-col items-center shadow-2xl relative mb-4">
+            {/* Downloadable Ticket Section (Hidden container for rendering) */}
+            <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
+              <TicketTemplate 
+                ref={ticketRef}
+                eventTitle={eventTitle}
+                name={userName}
+                email={userEmail}
+                registrationId={currentHash}
+                qrCodeUrl={qrCodeUrl}
+              />
+            </div>
+            
+            {/* Visual Preview for Modal */}
+            <div className="bg-[#18181b] border border-white/10 rounded-2xl p-8 flex flex-col items-center shadow-2xl relative mb-4">
               <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-t-2xl"></div>
               <h3 className="text-xl font-bold text-white mt-4 mb-2 text-center">OFFICIAL TICKET</h3>
               <p className="text-sm text-blue-400 mb-8 text-center font-bold max-w-[250px]">{eventTitle}</p>

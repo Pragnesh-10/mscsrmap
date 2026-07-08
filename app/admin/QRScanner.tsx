@@ -6,6 +6,7 @@ import { createClient } from '@/utils/supabase/client'
 import { 
   initDB, 
   saveRegistrations, 
+  saveSingleRegistration, 
   getRegistrationByHash, 
   updateLocalRegistrationCheckin, 
   addToSyncQueue, 
@@ -97,6 +98,7 @@ export default function QRScanner({ eventId }: { eventId?: string }) {
   const [scanResult, setScanResult] = useState<string | null>(null)
   const [secureContextError, setSecureContextError] = useState(false)
   const [cameraError, setCameraError] = useState<string | null>(null)
+  const [isCameraActive, setIsCameraActive] = useState(false)
   const scannerRef = useRef<Html5Qrcode | null>(null)
   
   // Offline-first States
@@ -212,6 +214,8 @@ export default function QRScanner({ eventId }: { eventId?: string }) {
 
   // Initialize Camera selection and start default
   useEffect(() => {
+    if (!isCameraActive) return
+
     if (typeof window !== 'undefined' && !window.isSecureContext) {
       setSecureContextError(true)
       return
@@ -250,7 +254,7 @@ export default function QRScanner({ eventId }: { eventId?: string }) {
         try { html5QrCode.clear() } catch(e) {}
       }
     }
-  }, [])
+  }, [isCameraActive])
 
   // Manual lookup search effect
   useEffect(() => {
@@ -464,21 +468,31 @@ export default function QRScanner({ eventId }: { eventId?: string }) {
     const hash = selectedReg.hash_payload
 
     try {
-      // 1. Update local IndexedDB cache instantly
-      await updateLocalRegistrationCheckin(hash, type, memberIndex)
+      // 1. Deep clone selectedReg to avoid mutation side-effects and guarantee updatedReg is defined
+      const updatedReg = JSON.parse(JSON.stringify(selectedReg))
+
+      if (type === 'PRIMARY') {
+        updatedReg.checked_in = true
+      } else if (type === 'MEMBER' && typeof memberIndex === 'number' && updatedReg.team_data?.members) {
+        if (updatedReg.team_data.members[memberIndex]) {
+          updatedReg.team_data.members[memberIndex].checked_in = true
+        }
+      }
+
+      // 2. Save the updated record in IndexedDB (handles new/uncached registrations correctly)
+      await saveSingleRegistration(updatedReg)
       
-      // 2. Add to transaction sync queue
+      // 3. Add to sync queue
       await addToSyncQueue(eventId, hash, type, memberIndex)
       
-      // 3. Update active modal view state
-      const updatedReg = await getRegistrationByHash(hash)
+      // 4. Update state with the updated registration object
       setSelectedReg(updatedReg)
       
-      // 4. Update sync status indicator
+      // 5. Update sync status indicator
       const queue = await getSyncQueue()
       setPendingSyncCount(queue.length)
 
-      // 5. Add to Scan history Feed
+      // 6. Add to Scan history Feed
       let attendeeName = updatedReg.form_data?.fullName || updatedReg.lead_email
       if (type === 'MEMBER' && typeof memberIndex === 'number' && updatedReg.team_data?.members[memberIndex]) {
         attendeeName = updatedReg.team_data.members[memberIndex].fullName || `Member ${memberIndex + 2}`
@@ -494,7 +508,7 @@ export default function QRScanner({ eventId }: { eventId?: string }) {
       }
       setScanHistory(prev => [newLog, ...prev.slice(0, 4)])
 
-      // 6. Fire sync action in background if online
+      // 7. Fire sync action in background if online
       if (isOnline) {
         syncPendingQueue()
       }
@@ -598,18 +612,38 @@ export default function QRScanner({ eventId }: { eventId?: string }) {
         
         {/* HTML5 QR Code target container */}
         {secureContextError ? (
-          <div className="text-center p-8 bg-red-500/10 min-h-[300px] flex flex-col items-center justify-center">
+          <div className="text-center p-8 bg-red-500/10 min-h-[320px] flex flex-col items-center justify-center">
             <i className="fas fa-exclamation-triangle text-4xl text-red-500 mb-4"></i>
             <h3 className="text-xl font-bold text-red-400 mb-2">Camera Blocked by Browser</h3>
             <p className="text-white/60 text-sm max-w-sm">
               Camera access is denied. Ensure you are accessing via HTTPS or localhost for secure context permission.
             </p>
           </div>
+        ) : !isCameraActive ? (
+          <div className="text-center p-8 min-h-[320px] flex flex-col items-center justify-center">
+            <i className="fas fa-camera text-4xl text-blue-400 mb-4 animate-pulse"></i>
+            <h3 className="text-xl font-bold text-white mb-2">Camera Standby</h3>
+            <p className="text-white/60 text-sm max-w-xs mb-6">
+              Camera access is required to scan tickets. Click the button below to enable the scanner.
+            </p>
+            <button
+              onClick={() => { triggerHaptic('light'); setIsCameraActive(true); }}
+              className="px-6 py-3 bg-blue-500 hover:bg-blue-600 rounded-xl font-bold transition-all text-white shadow-md cursor-pointer text-xs flex items-center gap-2"
+            >
+              <i className="fas fa-video"></i> Start Camera Scanner
+            </button>
+          </div>
         ) : cameraError ? (
-          <div className="text-center p-8 bg-red-500/10 min-h-[300px] flex flex-col items-center justify-center">
+          <div className="text-center p-8 bg-red-500/10 min-h-[320px] flex flex-col items-center justify-center">
             <i className="fas fa-video-slash text-4xl text-red-500 mb-4"></i>
             <h3 className="text-xl font-bold text-red-400 mb-2">Camera Access Error</h3>
-            <p className="text-white/60 text-sm max-w-xs">{cameraError}</p>
+            <p className="text-white/60 text-sm max-w-xs mb-4">{cameraError}</p>
+            <button
+              onClick={() => { triggerHaptic('light'); setCameraError(null); setIsCameraActive(false); }}
+              className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-semibold cursor-pointer"
+            >
+              Try Again
+            </button>
           </div>
         ) : (
           <>

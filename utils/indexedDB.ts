@@ -66,6 +66,24 @@ export async function saveRegistrations(regs: any[]): Promise<void> {
   });
 }
 
+export async function saveSingleRegistration(reg: any): Promise<void> {
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(['registrations'], 'readwrite');
+    const store = transaction.objectStore('registrations');
+    const request = store.put(reg);
+
+    request.onsuccess = () => {
+      resolve();
+    };
+
+    request.onerror = (e) => {
+      console.error('Error saving single registration to IndexedDB:', e);
+      reject(e);
+    };
+  });
+}
+
 export async function getRegistrationByHash(hash: string): Promise<any | null> {
   const db = await initDB();
   return new Promise((resolve, reject) => {
@@ -254,4 +272,3 @@ export async function searchCachedRegistrations(query: string): Promise<any[]> {
     };
   });
 }
-

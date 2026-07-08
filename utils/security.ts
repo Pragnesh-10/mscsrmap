@@ -47,45 +47,7 @@ export function decrypt(encryptedText: string): string {
   }
 }
 
-/**
- * Sanitizes input strings to prevent HTML/Script Injection (XSS).
- */
-export function sanitizeString(input: string): string {
-  if (typeof input !== 'string') return '';
-  return input
-    .trim()
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#x27;')
-    .replace(/\//g, '&#x2F;');
-}
 
-
-export function sanitizeObject(obj: any): any {
-  if (obj === null || obj === undefined) return obj;
-  
-  if (typeof obj === 'string') {
-    return sanitizeString(obj);
-  }
-  
-  if (Array.isArray(obj)) {
-    return obj.map(item => sanitizeObject(item));
-  }
-  
-  if (typeof obj === 'object') {
-    const sanitized: Record<string, any> = {};
-    for (const key in obj) {
-      if (Object.prototype.hasOwnProperty.call(obj, key)) {
-        sanitized[key] = sanitizeObject(obj[key]);
-      }
-    }
-    return sanitized;
-  }
-  
-  return obj;
-}
 
 /**
  * Validates that a string matches a strict email format.

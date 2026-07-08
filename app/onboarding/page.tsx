@@ -75,6 +75,7 @@ export default function OnboardingPage() {
               <option value="BBA">BBA</option>
               <option value="MBA">MBA</option>
               <option value="Mechanical">Mechanical</option>
+              <option value="Civil">Civil</option>
               <option value="others">others</option>
             </select>
           </div>

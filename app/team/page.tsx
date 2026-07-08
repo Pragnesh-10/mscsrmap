@@ -56,6 +56,26 @@ export default async function TeamPage() {
                         <i className="fab fa-github text-lg"></i>
                       </a>
                     )}
+                    {member.twitter_url && (
+                      <a href={member.twitter_url} target="_blank" rel="noopener noreferrer" className="hover:text-[#1DA1F2] transition-colors">
+                        <i className="fab fa-twitter text-lg"></i>
+                      </a>
+                    )}
+                    {member.instagram_url && (
+                      <a href={member.instagram_url} target="_blank" rel="noopener noreferrer" className="hover:text-[#E1306C] transition-colors">
+                        <i className="fab fa-instagram text-lg"></i>
+                      </a>
+                    )}
+                    {member.email && (
+                      <a href={`mailto:${member.email}`} className="hover:text-white transition-colors">
+                        <i className="fas fa-envelope text-lg"></i>
+                      </a>
+                    )}
+                    {member.portfolio_url && (
+                      <a href={member.portfolio_url} target="_blank" rel="noopener noreferrer" className="hover:text-green-400 transition-colors">
+                        <i className="fas fa-globe text-lg"></i>
+                      </a>
+                    )}
                   </div>
                 </div>
               </div>

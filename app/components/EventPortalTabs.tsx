@@ -3,10 +3,84 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { QRCodeSVG } from 'qrcode.react'
+import { TicketTemplate } from './TicketTemplate'
 import { submitPublicRegistration, lookupTeamRegistration, joinMatchmakingTeam } from '../events/actions'
 
+function CertificatePreview({ member, reqs, event, currentReg }: any) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  const [dimensions, setDimensions] = useState({ w: 1122, h: 794 });
+
+  useEffect(() => {
+    const observer = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        const containerWidth = entry.contentRect.width;
+        setScale(containerWidth / dimensions.w);
+      }
+    });
+    if (containerRef.current) observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, [dimensions.w]);
+
+  const htmlContent = reqs.certificate_html
+    .replace(/<link\s+([^>]*href="https:\/\/fonts\.googleapis\.com[^"]*")/gi, (match: string) => {
+      if (!match.includes('crossorigin')) {
+        return match.replace('<link', '<link crossorigin="anonymous"');
+      }
+      return match;
+    })
+    .replace(/\{\{NAME\}\}/g, member.name)
+    .replace(/\{\{EVENT_TITLE\}\}/g, event.title || '')
+    .replace(/\{\{EVENT_DATE\}\}/g, new Date(event.date_start).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }))
+    .replace(/\{\{COLLEGE_NAME\}\}/g, currentReg.form_data?.collegeName || 'SRMAP');
+
+  // Inject a script to report actual body size if it differs, so we can adjust the iframe size
+  const htmlWithReporter = htmlContent + `
+    <script>
+      window.onload = () => {
+        const content = document.body.firstElementChild || document.body;
+        const w = content.scrollWidth || 1122;
+        const h = content.scrollHeight || 794;
+        if (w > 0 && h > 0) {
+          window.parent.postMessage({ type: 'CERT_SIZE', memberId: '${member.id}', w, h }, '*');
+        }
+      };
+    </script>
+  `;
+
+  useEffect(() => {
+    const handleMsg = (e: MessageEvent) => {
+      if (e.data?.type === 'CERT_SIZE' && e.data?.memberId === member.id) {
+        if (e.data.w > 0 && e.data.h > 0) {
+          setDimensions({ w: e.data.w, h: e.data.h });
+        }
+      }
+    };
+    window.addEventListener('message', handleMsg);
+    return () => window.removeEventListener('message', handleMsg);
+  }, [member.id]);
+
+  return (
+    <div ref={containerRef} className="w-full max-w-3xl relative shadow-2xl mb-6 bg-white overflow-hidden rounded-xl" style={{ aspectRatio: `${dimensions.w}/${dimensions.h}` }}>
+      <iframe 
+        id={`certificate-node-${member.id}`} 
+        title={`Certificate for ${member.name}`}
+        className="absolute top-0 left-0 border-0 pointer-events-none bg-white"
+        style={{
+          width: `${dimensions.w}px`,
+          height: `${dimensions.h}px`,
+          transform: `scale(${scale})`,
+          transformOrigin: 'top left'
+        }}
+        srcDoc={htmlWithReporter}
+      />
+    </div>
+  );
+}
+
 export default function EventPortalTabs({ event, isWaitlistMode = false, openTeams = [], invitedTeam = null }: { event: any, isWaitlistMode?: boolean, openTeams?: any[], invitedTeam?: any }) {
-  const [activeTab, setActiveTab] = useState<'register' | 'matchmaking' | 'check' | 'certificate'>(event.status === 'completed' ? 'check' : 'register')
+  const isOpen = !!event.registration_open
+  const [activeTab, setActiveTab] = useState<'register' | 'matchmaking' | 'check' | 'certificate'>(event.status === 'completed' || !isOpen ? 'check' : 'register')
   const [mounted, setMounted] = useState(false)
   const [isCreatingTeam, setIsCreatingTeam] = useState(false)
 
@@ -42,7 +116,7 @@ export default function EventPortalTabs({ event, isWaitlistMode = false, openTea
     req_reg_num: true, req_branch: false, req_spec: false, allow_teams: false, max_team_size: 1, provide_certificates: true
   }
   const provideCertificates = reqs.provide_certificates !== false
-  const isOpen = !!event.registration_open
+
 
   useEffect(() => {
     setMounted(true)
@@ -71,7 +145,15 @@ export default function EventPortalTabs({ event, isWaitlistMode = false, openTea
         setLoading(false)
         return
       }
-      if (reqs.req_reg_num) baseData.regNum = formData.get('regNum')
+      if (reqs.req_reg_num) {
+        const regNumVal = formData.get('regNum')?.toString() || ''
+        if (!regNumVal.toUpperCase().startsWith('AP')) {
+          setErrorMsg('SRMAP Registration Number must start with AP.')
+          setLoading(false)
+          return
+        }
+        baseData.regNum = regNumVal
+      }
       if (reqs.req_branch) baseData.branch = formData.get('branch')
       if (reqs.req_spec) baseData.specialization = formData.get('specialization')
     } else {
@@ -98,7 +180,15 @@ export default function EventPortalTabs({ event, isWaitlistMode = false, openTea
         year: formData.get(`member_${i}_year`)
       }
       if (isInternal) {
-        if (reqs.req_reg_num) member.regNum = formData.get(`member_${i}_regNum`)
+        if (reqs.req_reg_num) {
+          const memberRegNum = formData.get(`member_${i}_regNum`)?.toString() || ''
+          if (!memberRegNum.toUpperCase().startsWith('AP')) {
+            setErrorMsg(`Member ${i + 1}'s Registration Number must start with AP.`)
+            setLoading(false)
+            return
+          }
+          member.regNum = memberRegNum
+        }
         if (reqs.req_branch) member.branch = formData.get(`member_${i}_branch`)
         if (reqs.req_spec) member.spec = formData.get(`member_${i}_spec`)
       }
@@ -179,9 +269,8 @@ export default function EventPortalTabs({ event, isWaitlistMode = false, openTea
   async function downloadTicket() {
     if (!ticketRef.current) return;
     try {
-      // @ts-ignore
-      const domtoimage = (await import('dom-to-image-more')).default
-      const dataUrl = await domtoimage.toPng(ticketRef.current, { bgcolor: '#18181b', scale: 2 })
+      const htmlToImage = await import('html-to-image')
+      const dataUrl = await htmlToImage.toPng(ticketRef.current, { backgroundColor: '#F3F5F8', pixelRatio: 2, style: { transform: 'scale(1)', transformOrigin: 'top left' } })
       const link = document.createElement('a')
       link.download = `Event-Ticket-${currentHash?.substring(0, 8)}.png`
       link.href = dataUrl
@@ -195,9 +284,17 @@ export default function EventPortalTabs({ event, isWaitlistMode = false, openTea
     const certEl = document.getElementById(`certificate-node-${memberId}`)
     if (!certEl) return;
     try {
-      // @ts-ignore
-      const domtoimage = (await import('dom-to-image-more')).default
-      const dataUrl = await domtoimage.toPng(certEl, { bgcolor: '#0a0a0b', scale: 2 })
+      const htmlToImage = await import('html-to-image')
+      
+      let targetNode = certEl;
+      if (certEl.tagName.toLowerCase() === 'iframe') {
+        const iframeDoc = (certEl as HTMLIFrameElement).contentDocument;
+        if (iframeDoc && iframeDoc.body) {
+          targetNode = iframeDoc.body;
+        }
+      }
+
+      const dataUrl = await htmlToImage.toPng(targetNode, { backgroundColor: '#0a0a0b', pixelRatio: 2 })
       const link = document.createElement('a')
       link.download = `${memberName.replace(/[^a-zA-Z0-9]/g, '_')}-Certificate.png`
       link.href = dataUrl
@@ -326,7 +423,17 @@ export default function EventPortalTabs({ event, isWaitlistMode = false, openTea
                     <i className="fas fa-lock text-2xl"></i>
                   </div>
                   <h3 className="text-xl font-bold text-red-400 mb-2">Registrations are Closed</h3>
-                  <p className="text-red-400/60 text-sm">The administration has closed registrations for this event.</p>
+                  <p className="text-red-400/60 text-sm mb-6">The administration has closed registrations for this event.</p>
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <button onClick={() => setActiveTab('check')} className="px-6 py-3 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 text-purple-400 rounded-xl font-bold transition-colors">
+                      <i className="fas fa-search mr-2"></i> Find Team Details
+                    </button>
+                    {provideCertificates && (
+                      <button onClick={() => setActiveTab('certificate')} className="px-6 py-3 bg-green-500/20 hover:bg-green-500/30 border border-green-500/30 text-green-400 rounded-xl font-bold transition-colors">
+                        <i className="fas fa-certificate mr-2"></i> Download E-Certificate
+                      </button>
+                    )}
+                  </div>
                 </div>
               ) : currentHash ? (
                  <div className="bg-green-500/10 border border-green-500/20 rounded-2xl p-8 flex flex-col items-center text-center">
@@ -341,10 +448,15 @@ export default function EventPortalTabs({ event, isWaitlistMode = false, openTea
                     </button>
                     {currentTeamId && (
                       <button 
-                        onClick={() => {
+                        onClick={async () => {
                           const inviteUrl = `${window.location.origin}/events/${event.slug || event.id}?invite=${currentTeamId}`;
-                          navigator.clipboard.writeText(inviteUrl);
-                          alert("Invite link copied to clipboard!");
+                          try {
+                            await navigator.clipboard.writeText(inviteUrl);
+                            alert("Invite link copied to clipboard!");
+                          } catch (err) {
+                            console.warn("Clipboard access denied. Falling back to prompt:", err);
+                            window.prompt("Copy this invite link:", inviteUrl);
+                          }
                         }} 
                         className="px-6 py-3 bg-white/10 hover:bg-white/20 border border-white/10 rounded-xl font-bold transition-colors text-white flex items-center gap-2"
                       >
@@ -405,6 +517,7 @@ export default function EventPortalTabs({ event, isWaitlistMode = false, openTea
                               <option value="BBA">BBA</option>
                               <option value="MBA">MBA</option>
                               <option value="Mechanical">Mechanical</option>
+                              <option value="Civil">Civil</option>
                               <option value="others">others</option>
                             </select>
                           </div>
@@ -509,6 +622,7 @@ export default function EventPortalTabs({ event, isWaitlistMode = false, openTea
                                           <option value="BBA">BBA</option>
                                           <option value="MBA">MBA</option>
                                           <option value="Mechanical">Mechanical</option>
+                                          <option value="Civil">Civil</option>
                                           <option value="others">others</option>
                                         </select>
                                       </div>
@@ -730,17 +844,7 @@ export default function EventPortalTabs({ event, isWaitlistMode = false, openTea
                         <>
                           {/* Certificate Node for html2canvas */}
                           {reqs.certificate_html ? (
-                            <div 
-                              id={`certificate-node-${member.id}`} 
-                              className="w-full max-w-3xl aspect-[1.414/1] relative shadow-2xl mb-6 overflow-hidden bg-white"
-                              dangerouslySetInnerHTML={{ 
-                                __html: reqs.certificate_html
-                                  .replace(/\{\{NAME\}\}/g, member.name)
-                                  .replace(/\{\{EVENT_TITLE\}\}/g, event.title || '')
-                                  .replace(/\{\{EVENT_DATE\}\}/g, new Date(event.date_start).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }))
-                                  .replace(/\{\{COLLEGE_NAME\}\}/g, currentReg.form_data?.collegeName || 'SRMAP')
-                              }}
-                            />
+                            <CertificatePreview member={member} reqs={reqs} event={event} currentReg={currentReg} />
                           ) : (
                             <div id={`certificate-node-${member.id}`} className="relative w-full max-w-3xl aspect-[1.414/1] bg-[#0a0a0b] overflow-hidden border-8 border-double p-12 flex flex-col items-center text-center shadow-2xl mb-6"
                             style={{
@@ -808,77 +912,136 @@ export default function EventPortalTabs({ event, isWaitlistMode = false, openTea
       {/* QR Code Ticket Modal */}
       {mounted && showTicketModal && currentHash && createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <button onClick={() => setShowTicketModal(false)} className="fixed top-6 right-6 text-white/60 hover:text-white transition-colors z-[110] p-2 bg-black/50 rounded-full w-10 h-10 flex items-center justify-center backdrop-blur-md border border-white/10">
+            <i className="fas fa-times text-xl"></i>
+          </button>
           <div className="max-w-sm w-full relative">
-            <button onClick={() => setShowTicketModal(false)} className="absolute -top-12 right-0 text-white/40 hover:text-white transition-colors">
-              <i className="fas fa-times text-2xl"></i>
-            </button>
             
-            <div ref={ticketRef} className="bg-[#18181b] border border-white/10 rounded-2xl p-8 flex flex-col items-center shadow-2xl relative mb-4 w-[400px]">
-              <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-t-2xl"></div>
-              
-              <div className="w-full border-b border-white/10 pb-4 mb-6 text-center mt-2">
-                <h3 className="text-xl font-black text-white tracking-wider">OFFICIAL REGISTRATION</h3>
-                <p className="text-sm text-blue-400 font-bold mt-1">{event.title}</p>
-                {event.location && (
-                  <p className="text-xs text-white/60 mt-1 flex items-center justify-center gap-1">
-                    <i className="fas fa-map-marker-alt"></i> {event.location}
-                  </p>
-                )}
-                {event.date_start && (
-                  <p className="text-xs text-white/60 mt-1 flex items-center justify-center gap-1">
-                    <i className="fas fa-calendar-alt"></i> {new Date(event.date_start).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}
-                  </p>
+            {/* Hidden Ticket Container for Rendering */}
+            <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
+              <TicketTemplate 
+                ref={ticketRef}
+                eventTitle={event.title}
+                eventDate={event.date_start ? new Date(event.date_start).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', month: 'short', day: 'numeric', year: 'numeric' }) : 'TBD'}
+                eventTime={event.date_start ? new Date(event.date_start).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' }) : 'TBD'}
+                eventVenue={event.location || 'TBD'}
+                eventType={event.type || 'Event'}
+                posterUrl={event.image_url}
+                teamName={currentReg?.team_data?.teamName}
+                teamMembers={currentReg?.team_data?.members?.length}
+                registrationType={currentReg?.team_data?.teamName ? 'Team' : 'Individual'}
+                collegeName={currentReg?.form_data?.collegeName || 'SRM University AP'}
+                name={currentReg?.form_data?.fullName || currentReg?.lead_email?.split('@')[0] || '-'}
+                email={currentReg?.lead_email || '-'}
+                registrationId={currentHash}
+                qrCodeUrl={typeof window !== 'undefined' ? `${window.location.origin}/admin/checkin/${currentHash}` : ''}
+              />
+            </div>
+            
+            {/* Visual Preview */}
+            <div className="bg-[#0a0a0b] border border-white/10 rounded-3xl flex flex-col shadow-[0_20px_50px_rgba(0,0,0,0.5)] relative mb-4 w-[400px] mx-auto overflow-hidden group">
+              {/* Background Glow */}
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[300px] h-[300px] bg-blue-500/20 blur-[80px] rounded-full pointer-events-none z-0"></div>
+
+              {/* Ticket Top Banner */}
+              <div className="w-full relative z-10">
+                {event.image_url ? (
+                  <div className="w-full h-32 relative">
+                    <img src={event.image_url} alt="Event Cover" className="w-full h-full object-cover opacity-60" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0b] to-transparent"></div>
+                  </div>
+                ) : (
+                  <div className="w-full h-24 bg-gradient-to-br from-blue-600/40 to-purple-600/40 relative">
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0b] to-transparent"></div>
+                  </div>
                 )}
               </div>
 
-              <div className="flex w-full justify-between items-center mb-6">
-                <div className="bg-white p-4 rounded-2xl shadow-[0_0_20px_rgba(59,130,246,0.15)] shrink-0">
-                  <QRCodeSVG value={currentHash || ''} size={150} level="M" />
+              {/* Event Details Header */}
+              <div className="w-full px-8 pb-4 -mt-12 relative z-10 text-center">
+                <div className="bg-white/10 backdrop-blur-md text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border border-white/20 inline-block mb-3 text-white/90 shadow-xl">
+                  VIP Access Pass
                 </div>
-                
-                <div className="ml-6 flex-1 flex flex-col items-end text-right">
-                  <p className="text-[10px] uppercase tracking-widest text-white/40 mb-1">Primary Registrant</p>
-                  <div className="flex items-center gap-2 mb-3 justify-end">
-                    {currentReg?.checked_in && <span className="text-green-500 text-xs"><i className="fas fa-check-circle"></i></span>}
-                    <p className="text-sm font-bold text-white">
-                      {currentReg?.form_data?.fullName || currentReg?.lead_email || 'N/A'}
-                    </p>
-                  </div>
-                  
-                  {currentReg?.team_data?.teamName && (
-                    <>
-                      <p className="text-[10px] uppercase tracking-widest text-white/40 mb-1">Team Name</p>
-                      <p className="text-sm font-bold text-purple-400">{currentReg.team_data.teamName}</p>
-                    </>
+                <h3 className="text-2xl font-black text-white tracking-tight leading-tight drop-shadow-lg">{event.title}</h3>
+                <div className="flex flex-wrap items-center justify-center gap-3 text-xs text-white/70 mt-3 font-semibold">
+                  {event.date_start && (
+                    <span className="flex items-center gap-1">
+                      <i className="fas fa-calendar-alt text-blue-400"></i> {new Date(event.date_start).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', month: 'short', day: 'numeric', year: 'numeric' })}
+                    </span>
+                  )}
+                  {event.location && (
+                    <span className="flex items-center gap-1">
+                      <i className="fas fa-map-marker-alt text-purple-400"></i> {event.location}
+                    </span>
                   )}
                 </div>
               </div>
 
-              {currentReg?.team_data?.members && currentReg.team_data.members.length > 0 && (
-                <div className="w-full bg-black/40 rounded-xl p-4 mb-6 border border-white/5">
-                  <p className="text-[10px] uppercase tracking-widest text-white/40 mb-2 border-b border-white/5 pb-2">Team Members</p>
-                  <div className="flex flex-col gap-1">
-                    {currentReg.team_data.members.map((m: any, idx: number) => (
-                      <p key={idx} className="text-xs text-white/80 flex justify-between items-center">
-                        <span className="flex items-center gap-2">
-                          {m.checked_in ? <i className="fas fa-check-circle text-green-500"></i> : <i className="fas fa-clock text-white/20"></i>}
-                          {m.fullName || m.email}
-                        </span>
-                        {currentReg.team_data.leadIndex === idx + 1 && <span className="text-purple-400 text-[10px] font-bold">LEAD</span>}
-                      </p>
-                    ))}
-                    {currentReg.team_data.leadIndex === 0 && (
-                      <p className="text-xs text-white/80 flex justify-between items-center">
-                        <span className="flex items-center gap-2">
-                          {currentReg.checked_in ? <i className="fas fa-check-circle text-green-500"></i> : <i className="fas fa-clock text-white/20"></i>}
-                          {currentReg.form_data?.fullName || currentReg.lead_email}
-                        </span>
-                        <span className="text-purple-400 text-[10px] font-bold">LEAD</span>
-                      </p>
+              {/* Stub Separator (Dashed Line) */}
+              <div className="w-full flex items-center px-6 relative z-10 my-4 opacity-50">
+                <div className="w-2 h-2 rounded-full bg-white/20"></div>
+                <div className="flex-1 border-t-2 border-dashed border-white/20 mx-2"></div>
+                <div className="w-2 h-2 rounded-full bg-white/20"></div>
+              </div>
+
+              {/* Attendee Details & QR Code */}
+              <div className="w-full px-8 pb-8 flex flex-col items-center relative z-10">
+                <div className="bg-white p-3 rounded-2xl shadow-[0_0_40px_rgba(59,130,246,0.3)] mb-6 transform group-hover:scale-105 transition-transform duration-500">
+                  <QRCodeSVG value={currentHash || ''} size={150} level="M" />
+                </div>
+                
+                <div className="text-center w-full">
+                  <p className="text-[10px] uppercase tracking-widest text-blue-400 font-bold mb-1">Passholder</p>
+                  <p className="text-lg font-bold text-white mb-5 drop-shadow-md">
+                    {currentReg?.form_data?.fullName || currentReg?.lead_email || 'N/A'}
+                  </p>
+                  
+                  <div className="grid grid-cols-2 gap-4 text-left bg-white/5 border border-white/10 p-4 rounded-xl shadow-inner">
+                    <div>
+                      <p className="text-[10px] uppercase tracking-widest text-white/40 mb-1">Ticket ID</p>
+                      <p className="text-xs font-mono font-bold text-white/90">MSC{currentHash?.substring(0, 7).toUpperCase()}</p>
+                    </div>
+                    {currentReg?.team_data?.teamName ? (
+                      <div>
+                        <p className="text-[10px] uppercase tracking-widest text-white/40 mb-1">Team Name</p>
+                        <p className="text-xs font-bold text-purple-400 truncate">{currentReg.team_data.teamName}</p>
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="text-[10px] uppercase tracking-widest text-white/40 mb-1">Status</p>
+                        <p className="text-xs font-bold text-green-400">Confirmed</p>
+                      </div>
                     )}
                   </div>
                 </div>
-              )}
+
+                {/* Team Members List (If any) */}
+                {currentReg?.team_data?.members && currentReg.team_data.members.length > 0 && (
+                  <div className="w-full mt-4 bg-white/5 rounded-xl p-4 border border-white/10 shadow-inner">
+                    <p className="text-[10px] uppercase tracking-widest text-white/40 mb-3 border-b border-white/10 pb-2">Team Members</p>
+                    <div className="flex flex-col gap-2">
+                      {currentReg.team_data.leadIndex === 0 && (
+                        <p className="text-[11px] text-white/80 flex justify-between items-center">
+                          <span className="flex items-center gap-2 truncate">
+                            {currentReg.checked_in ? <i className="fas fa-check-circle text-green-500"></i> : <i className="fas fa-circle text-white/20 text-[8px]"></i>}
+                            {currentReg.form_data?.fullName || currentReg.lead_email}
+                          </span>
+                          <span className="bg-blue-500/20 text-blue-400 text-[8px] font-black tracking-widest px-2 py-0.5 rounded-sm">LEAD</span>
+                        </p>
+                      )}
+                      {currentReg.team_data.members.map((m: any, idx: number) => (
+                        <p key={idx} className="text-[11px] text-white/80 flex justify-between items-center">
+                          <span className="flex items-center gap-2 truncate">
+                            {m.checked_in ? <i className="fas fa-check-circle text-green-500"></i> : <i className="fas fa-circle text-white/20 text-[8px]"></i>}
+                            {m.fullName || m.email}
+                          </span>
+                          {currentReg.team_data.leadIndex === idx + 1 && <span className="bg-blue-500/20 text-blue-400 text-[8px] font-black tracking-widest px-2 py-0.5 rounded-sm">LEAD</span>}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             <button onClick={downloadTicket} className="w-full py-4 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 rounded-xl text-white font-bold transition-colors shadow-lg flex justify-center items-center gap-2">

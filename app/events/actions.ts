@@ -3,13 +3,11 @@
 import { createAdminClient } from '@/utils/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import crypto from 'crypto'
-import { sendRegistrationEmail } from '@/utils/resend'
-import { sanitizeObject, sanitizeString, validateEmail } from '@/utils/security'
+import { sendRegistrationEmail, sendTeamJoinNotificationEmail } from '@/utils/resend'
+import { validateEmail } from '@/utils/security'
 
 export async function submitPublicRegistration(eventId: string, formData: any) {
-  // Sanitize all inputs to prevent XSS/Injection
-  eventId = sanitizeString(eventId)
-  formData = sanitizeObject(formData)
+  eventId = typeof eventId === 'string' ? eventId.trim() : ''
 
   const supabase = createAdminClient()
 
@@ -61,6 +59,20 @@ export async function submitPublicRegistration(eventId: string, formData: any) {
       if (email && !email.toLowerCase().endsWith('@srmap.edu.in')) {
         return { error: 'All team members must use @srmap.edu.in email addresses for this event.' }
       }
+    }
+  }
+
+  // Validate Team Name uniqueness for this event
+  if (formData.teamName) {
+    const { data: existingTeam } = await supabase
+      .from('teams')
+      .select('id')
+      .eq('event_id', eventId)
+      .ilike('team_name', formData.teamName)
+      .limit(1)
+      
+    if (existingTeam && existingTeam.length > 0) {
+      return { error: 'This team name is already taken for this event. Please choose another one.' }
     }
   }
 
@@ -121,7 +133,7 @@ export async function submitPublicRegistration(eventId: string, formData: any) {
       event_id: eventId,
       lead_email: leadEmail,
       form_data: baseFormData,
-      team_data: teamMembers.length > 0 ? { members: teamMembers, leadIndex: teamLeadIndex, teamName: formData.teamName } : null,
+      team_data: (teamMembers.length > 0 || formData.teamName) ? { members: teamMembers, leadIndex: teamLeadIndex, teamName: formData.teamName } : null,
       hash_payload: hashPayload,
       status: assignedStatus
     }])
@@ -164,44 +176,8 @@ export async function submitPublicRegistration(eventId: string, formData: any) {
     if (newTeam) createdTeamId = newTeam.id
   }
 
-  // Send email confirmations asynchronously via Resend
-  const eventDateString = eventData.date_start 
-    ? new Date(eventData.date_start).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium' })
-    : 'TBA';
-
-  // Send to lead registrant
-  sendRegistrationEmail({
-    to: leadEmail,
-    name: baseFormData.fullName || 'Participant',
-    eventTitle: eventData.title || 'Event',
-    eventDate: eventDateString,
-    eventLocation: eventData.location || '',
-    status: assignedStatus,
-    hashPayload: hashPayload,
-    isTeam: teamMembers.length > 0,
-    teamName: formData.teamName,
-    teamMembers: teamMembers
-  }).catch(err => console.error('Failed to send registration email to lead:', err));
-
-  // Send to all team members
-  if (teamMembers && teamMembers.length > 0) {
-    teamMembers.forEach((member: any) => {
-      if (member.email) {
-        sendRegistrationEmail({
-          to: member.email.toLowerCase().trim(),
-          name: member.fullName || 'Participant',
-          eventTitle: eventData.title || 'Event',
-          eventDate: eventDateString,
-          eventLocation: eventData.location || '',
-          status: assignedStatus,
-          hashPayload: hashPayload,
-          isTeam: true,
-          teamName: formData.teamName,
-          teamMembers: teamMembers
-        }).catch(err => console.error(`Failed to send registration email to member (${member.email}):`, err));
-      }
-    });
-  }
+  // Email confirmations are disabled per user request
+  // (Previously sent emails via Resend here)
 
   // 8. Revalidate cache so the UI updates
   revalidatePath('/events', 'layout')
@@ -216,8 +192,8 @@ export async function submitPublicRegistration(eventId: string, formData: any) {
 }
 
 export async function lookupTeamRegistration(eventId: string, email: string) {
-  eventId = sanitizeString(eventId)
-  email = sanitizeString(email).toLowerCase().trim()
+  eventId = typeof eventId === 'string' ? eventId.trim() : ''
+  email = typeof email === 'string' ? email.toLowerCase().trim() : ''
 
   if (!email || !validateEmail(email)) {
     return { error: 'A valid email is required to look up registration.' }
@@ -259,8 +235,7 @@ export async function lookupTeamRegistration(eventId: string, email: string) {
 }
 
 export async function joinMatchmakingTeam(teamId: string, memberData: any) {
-  teamId = sanitizeString(teamId)
-  memberData = sanitizeObject(memberData)
+  teamId = typeof teamId === 'string' ? teamId.trim() : ''
 
   const email = memberData.email?.toLowerCase().trim()
   if (!email || !validateEmail(email)) {
@@ -273,7 +248,7 @@ export async function joinMatchmakingTeam(teamId: string, memberData: any) {
   // 1. Fetch the matchmaking team to get the registration link
   const { data: team, error: teamError } = await supabase
     .from('teams')
-    .select('registration_id, max_team_size, looking_for_members')
+    .select('registration_id, max_team_size, looking_for_members, leader_email, leader_name, team_name')
     .eq('id', teamId)
     .single()
 
@@ -332,25 +307,18 @@ export async function joinMatchmakingTeam(teamId: string, memberData: any) {
     await supabase.from('teams').update({ looking_for_members: false }).eq('id', teamId)
   }
 
-  // Send email confirmation to the joining member asynchronously
-  const event = reg.events as any;
-  if (event) {
-    const eventDateString = event.date_start 
-      ? new Date(event.date_start).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium' })
-      : 'TBA';
+  // Email confirmations are disabled per user request
+  // (Previously sent emails via Resend here)
 
-    sendRegistrationEmail({
-      to: memberData.email.toLowerCase().trim(),
-      name: memberData.fullName || 'Participant',
-      eventTitle: event.title || 'Event',
-      eventDate: eventDateString,
-      eventLocation: event.location || '',
-      status: reg.status || 'confirmed',
-      hashPayload: reg.hash_payload,
-      isTeam: true,
-      teamName: reg.team_data?.teamName || '',
-      teamMembers: newMembers
-    }).catch(err => console.error(`Failed to send join confirmation email to ${memberData.email}:`, err));
+  if (team.leader_email) {
+    await sendTeamJoinNotificationEmail({
+      to: team.leader_email,
+      leaderName: team.leader_name || '',
+      teamName: team.team_name || 'Your Team',
+      eventTitle: Array.isArray(reg.events) ? reg.events[0]?.title : (reg.events as any)?.title || 'an Event',
+      newMemberName: memberData.fullName || memberData.name || 'A participant',
+      newMemberEmail: memberData.email,
+    });
   }
 
   revalidatePath('/events', 'layout')

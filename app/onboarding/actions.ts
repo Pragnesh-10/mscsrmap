@@ -2,7 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
-import { sanitizeString, validatePhone } from '@/utils/security'
+import { validatePhone } from '@/utils/security'
 
 export async function submitOnboarding(formData: FormData) {
   const supabase = await createClient()
@@ -13,11 +13,11 @@ export async function submitOnboarding(formData: FormData) {
     return { error: 'Not authenticated' }
   }
 
-  const fullName = sanitizeString(formData.get('fullName') as string || '')
-  const regNumber = sanitizeString(formData.get('regNumber') as string || '')
-  const phoneNumber = sanitizeString(formData.get('phoneNumber') as string || '')
-  const department = sanitizeString(formData.get('department') as string || '')
-  const yearOfStudy = sanitizeString(formData.get('yearOfStudy') as string || '')
+  const fullName = (formData.get('fullName') as string || '').trim()
+  const regNumber = (formData.get('regNumber') as string || '').trim()
+  const phoneNumber = (formData.get('phoneNumber') as string || '').trim()
+  const department = (formData.get('department') as string || '').trim()
+  const yearOfStudy = (formData.get('yearOfStudy') as string || '').trim()
 
   if (!fullName || !regNumber || !phoneNumber || !department || !yearOfStudy) {
     return { error: 'All onboarding fields are required.' }

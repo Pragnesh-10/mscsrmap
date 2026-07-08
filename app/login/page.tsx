@@ -8,6 +8,7 @@ export default function LoginPage() {
   const [success, setSuccess] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [showResetForm, setShowResetForm] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   async function handleLoginSubmit(formData: FormData) {
     setLoading(true)
@@ -64,11 +65,21 @@ export default function LoginPage() {
             </div>
             <div>
               <label className="block text-sm text-[#aaaaaa] mb-2" htmlFor="new_password">New Password</label>
-              <input type="password" id="new_password" name="new_password" required placeholder="••••••••" className="w-full p-3 bg-black/50 border border-[#333333] rounded-md text-white focus:outline-none focus:border-[#0078d4] transition-colors" />
+              <div className="relative">
+                <input type={showPassword ? "text" : "password"} id="new_password" name="new_password" required placeholder="••••••••" className="w-full p-3 bg-black/50 border border-[#333333] rounded-md text-white focus:outline-none focus:border-[#0078d4] transition-colors pr-10" />
+                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#aaaaaa] hover:text-white">
+                  <i className={`fas ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+                </button>
+              </div>
             </div>
             <div>
               <label className="block text-sm text-[#aaaaaa] mb-2" htmlFor="confirm_password">Confirm New Password</label>
-              <input type="password" id="confirm_password" name="confirm_password" required placeholder="••••••••" className="w-full p-3 bg-black/50 border border-[#333333] rounded-md text-white focus:outline-none focus:border-[#0078d4] transition-colors" />
+              <div className="relative">
+                <input type={showPassword ? "text" : "password"} id="confirm_password" name="confirm_password" required placeholder="••••••••" className="w-full p-3 bg-black/50 border border-[#333333] rounded-md text-white focus:outline-none focus:border-[#0078d4] transition-colors pr-10" />
+                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#aaaaaa] hover:text-white">
+                  <i className={`fas ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+                </button>
+              </div>
             </div>
 
             {error && <div className="text-[#ff5555] text-sm text-center pt-2 bg-red-500/10 p-2 rounded border border-red-500/20">{error}</div>}
@@ -91,7 +102,12 @@ export default function LoginPage() {
             </div>
             <div>
               <label className="block text-sm text-[#aaaaaa] mb-2" htmlFor="password">Password</label>
-              <input type="password" id="password" name="password" required placeholder="••••••••" className="w-full p-3 bg-black/50 border border-[#333333] rounded-md text-white focus:outline-none focus:border-[#0078d4] transition-colors" />
+              <div className="relative">
+                <input type={showPassword ? "text" : "password"} id="password" name="password" required placeholder="••••••••" className="w-full p-3 bg-black/50 border border-[#333333] rounded-md text-white focus:outline-none focus:border-[#0078d4] transition-colors pr-10" />
+                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#aaaaaa] hover:text-white">
+                  <i className={`fas ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+                </button>
+              </div>
             </div>
 
             {error && <div className="text-[#ff5555] text-sm text-center pt-2 bg-red-500/10 p-2 rounded border border-red-500/20">{error}</div>}

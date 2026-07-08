@@ -1,6 +1,11 @@
 @import "tailwindcss";
 
 @theme {
+  --color-background: #0a0a0b;
+  --color-foreground: #ededed;
+  --color-muted: #1f1f23;
+  --color-muted-foreground: #a1a1aa;
+
   --color-accent: #ffffff;
   --color-accent-dim: rgba(255, 255, 255, 0.1);
   --color-text-primary: #ededed;
@@ -13,6 +18,11 @@
 }
 
 :root {
+  --background: #0a0a0b;
+  --foreground: #ededed;
+  --muted: #1f1f23;
+  --muted-foreground: #a1a1aa;
+
   --accent: #ffffff;
   --accent-dim: rgba(255, 255, 255, 0.1);
   --text-primary: #ededed;

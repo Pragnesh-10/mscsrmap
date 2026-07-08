@@ -334,4 +334,74 @@ export async function sendRegistrationEmail(payload: EmailPayload) {
   }
 }
 
+interface TeamJoinPayload {
+  to: string;
+  leaderName: string;
+  teamName: string;
+  eventTitle: string;
+  newMemberName: string;
+  newMemberEmail: string;
+}
 
+export async function sendTeamJoinNotificationEmail(payload: TeamJoinPayload) {
+  if (!resend) {
+    console.warn('⚠️ RESEND_API_KEY is not set. Notification email was not sent. Payload:', payload);
+    return { success: false, error: 'RESEND_API_KEY is not set' };
+  }
+
+  const {
+    to,
+    leaderName,
+    teamName,
+    eventTitle,
+    newMemberName,
+    newMemberEmail,
+  } = payload;
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <title>New Team Member Joined - ${teamName}</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #0a0a0b; color: #f4f4f5; padding: 20px; }
+          .container { max-width: 600px; margin: 0 auto; background-color: #18181b; border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 16px; padding: 30px; }
+          h2 { color: #ffffff; }
+          p { color: rgba(255, 255, 255, 0.7); line-height: 1.6; }
+          .highlight { color: #c084fc; font-weight: bold; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h2>New Team Member Alert!</h2>
+          <p>Hi <strong>${leaderName || 'Team Leader'}</strong>,</p>
+          <p>Great news! A new member has just joined your team <span class="highlight">${teamName}</span> for the event <strong>${eventTitle}</strong>.</p>
+          <div style="background-color: rgba(0, 0, 0, 0.2); border-radius: 8px; padding: 15px; margin: 20px 0;">
+            <p style="margin: 0;"><strong>New Member Details:</strong></p>
+            <p style="margin: 5px 0 0 0;">Name: ${newMemberName || 'Participant'}</p>
+            <p style="margin: 5px 0 0 0;">Email: <a href="mailto:${newMemberEmail}" style="color: #3b82f6;">${newMemberEmail}</a></p>
+          </div>
+          <p>Feel free to reach out and welcome them to the team!</p>
+          <p style="margin-top: 30px; font-size: 12px; color: rgba(255, 255, 255, 0.4);">
+            Microsoft Student Community • SRM University AP
+          </p>
+        </div>
+      </body>
+    </html>
+  `;
+
+  try {
+    const data = await resend.emails.send({
+      from: 'Microsoft Student Community <noreply@mscsrmap.edu.in>',
+      to: [to],
+      subject: `New Team Member Joined: ${teamName} (${eventTitle})`,
+      html: html,
+    });
+    console.log(`✉️ Team join notification sent to ${to} via Resend. ID:`, data);
+    return { success: true, data };
+  } catch (error) {
+    console.error(`❌ Failed to send team join notification to ${to}:`, error);
+    return { success: false, error };
+  }
+}
