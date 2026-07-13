@@ -1,7 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 import Link from 'next/link'
-import { logAudit } from '../../audit_actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -85,7 +84,6 @@ export default async function CheckinPage({ params, searchParams }: { params: Pr
     const sb = await createClient()
     await sb.from('registrations').update({ checked_in: true }).eq('hash_payload', hash)
     revalidatePath(`/admin/checkin/${hash}`)
-    await logAudit('SCAN_TICKET', { hash, event_title: reg.events.title, lead_email: reg.lead_email })
   }
 
   // The Server Action to check in an individual Team Member
@@ -102,7 +100,6 @@ export default async function CheckinPage({ params, searchParams }: { params: Pr
     
     await sb.from('registrations').update({ team_data: updatedTeamData }).eq('hash_payload', hash)
     revalidatePath(`/admin/checkin/${hash}`)
-    await logAudit('SCAN_TICKET_MEMBER', { hash, member_index: memberIndex, event_title: reg.events.title })
   }
 
   return (

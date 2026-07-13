@@ -27,7 +27,6 @@ const AnalyticsDashboard = dynamic(() => import('./AnalyticsDashboard'), {
 
 import SettingsTab from './SettingsTab'
 import PasswordRequestsTab from './PasswordRequestsTab'
-import { logAudit, fetchAuditLogs } from './audit_actions'
 
 export const triggerHaptic = (type: 'light' | 'medium' | 'heavy' | 'success' | 'warning' | 'error' = 'light') => {
   if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
@@ -57,7 +56,7 @@ export const triggerHaptic = (type: 'light' | 'medium' | 'heavy' | 'success' | '
 }
 
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState<'users' | 'events' | 'team' | 'analytics' | 'settings' | 'password_reqs' | 'audit'>('events')
+  const [activeTab, setActiveTab] = useState<'users' | 'events' | 'team' | 'analytics' | 'settings' | 'password_reqs'>('events')
   const supabase = createClient()
 
   const [userRole, setUserRole] = useState<'admin' | 'core_member' | null>(null)
@@ -68,8 +67,6 @@ export default function AdminPage() {
   const [loadingEvents, setLoadingEvents] = useState(true)
   const [loadingTeam, setLoadingTeam] = useState(true)
   const [editingTeamMember, setEditingTeamMember] = useState<any>(null)
-  const [auditLogs, setAuditLogs] = useState<any[]>([])
-  const [loadingAudit, setLoadingAudit] = useState(true)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [allowTeamsToggle, setAllowTeamsToggle] = useState(false)
   
@@ -87,15 +84,7 @@ export default function AdminPage() {
     if (activeTab === 'users') fetchUsers()
     if (activeTab === 'events') fetchEvents()
     if (activeTab === 'team') fetchTeam()
-    if (activeTab === 'audit') fetchAuditLogsData()
   }, [activeTab])
-
-  async function fetchAuditLogsData() {
-    setLoadingAudit(true)
-    const res = await fetchAuditLogs()
-    if (res.data) setAuditLogs(res.data)
-    setLoadingAudit(false)
-  }
 
   async function checkUserRole() {
     const { data: { session } } = await supabase.auth.getSession()
@@ -190,7 +179,6 @@ export default function AdminPage() {
     if (error) showStatus(`user_${userId}`, `Failed: ${error.message}`, 'error')
     else {
       showStatus(`user_${userId}`, 'Updated!', 'success')
-      await logAudit('UPDATE_ROLE', { target_user_id: userId, new_role: newRole })
     }
   }
 
@@ -232,7 +220,6 @@ export default function AdminPage() {
       triggerHaptic('error')
     } else {
       showStatus(`user_${resettingUser.id}`, 'Password Updated!', 'success')
-      await logAudit('CHANGE_PASSWORD', { target_user_id: resettingUser.id, target_email: resettingUser.email })
       setResettingUser(null)
       triggerHaptic('success')
     }
@@ -258,7 +245,6 @@ export default function AdminPage() {
     } else {
       showStatus(`user_${userId}`, 'User Deleted', 'success')
       fetchUsers()
-      await logAudit('DELETE_USER', { target_user_id: userId, target_email: email })
       triggerHaptic('success')
     }
   }
@@ -307,7 +293,6 @@ export default function AdminPage() {
     showStatus('create_user', 'Account Created Successfully!', 'success')
     ;(e.target as HTMLFormElement).reset()
     fetchUsers()
-    await logAudit('CREATE_USER', { new_email: email, role })
   }
 
   async function fetchEvents() {
@@ -368,7 +353,6 @@ export default function AdminPage() {
       showStatus('create_event', 'Event Created Successfully!', 'success')
       ;(e.target as HTMLFormElement).reset()
       fetchEvents()
-      await logAudit('CREATE_EVENT', { title })
     }
   }
 
@@ -388,7 +372,6 @@ export default function AdminPage() {
       }
       await supabase.from('events').delete().eq('id', id)
       fetchEvents()
-      await logAudit('DELETE_EVENT', { event_id: id, title })
     }
   }
 
@@ -399,7 +382,6 @@ export default function AdminPage() {
       showStatus(`event_${id}`, `Failed: ${error.message}`, 'error')
     } else {
       fetchEvents()
-      await logAudit('TOGGLE_REGISTRATION', { event_id: id, registration_open: !currentState })
     }
   }
 
@@ -411,7 +393,6 @@ export default function AdminPage() {
       showStatus(`event_${id}`, `Failed: ${error.message}`, 'error')
     } else {
       fetchEvents()
-      await logAudit('TOGGLE_EVENT_STATUS', { event_id: id, status: newStatus })
     }
   }
 
@@ -540,7 +521,7 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="flex flex-col md:flex-row h-screen bg-[#09090b] text-[#f4f4f5] font-sans overflow-hidden">
+    <div className="flex flex-col md:flex-row h-[100dvh] bg-[#09090b] text-[#f4f4f5] font-sans overflow-hidden">
       {/* Background glowing gradients */}
       <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] rounded-full bg-blue-500/10 blur-[120px] animate-pulse" style={{ animationDuration: '8s' }}></div>
@@ -561,7 +542,7 @@ export default function AdminPage() {
       </div>
 
       {/* Sidebar */}
-      <aside className={`fixed top-[61px] md:top-0 left-0 md:relative w-full md:w-[280px] bg-[#0c0c0e]/90 md:bg-[#0c0c0e]/60 backdrop-blur-2xl md:border-r border-white/5 flex flex-col p-6 z-40 h-[calc(100vh-61px)] md:h-auto transition-all duration-300 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'} overflow-y-auto justify-between`}>
+      <aside className={`fixed top-[61px] md:top-0 left-0 md:relative w-full md:w-[280px] bg-[#0c0c0e]/90 md:bg-[#0c0c0e]/60 backdrop-blur-2xl md:border-r border-white/5 flex flex-col p-6 z-40 h-[calc(100dvh-61px)] md:h-auto transition-all duration-300 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'} overflow-y-auto justify-between`}>
         <div className="flex flex-col">
           {/* Logo Brand Header */}
           <div className="hidden md:flex items-center gap-3 mb-10 mt-2 px-2">
@@ -585,16 +566,6 @@ export default function AdminPage() {
                   }`}
                 >
                   <i className="fas fa-users-cog w-4 text-blue-400/85"></i> User Access
-                </button>
-                <button 
-                  onClick={() => { triggerHaptic('light'); setActiveTab('audit'); setIsMobileMenuOpen(false); }} 
-                  className={`px-4 py-2.5 rounded-xl font-semibold text-xs transition-all text-left flex items-center gap-3 relative border ${
-                    activeTab === 'audit' 
-                      ? 'bg-white/5 border-white/10 text-white shadow-[inset_0_1px_rgba(255,255,255,0.05),0_10px_20px_rgba(0,0,0,0.4)] before:absolute before:left-0 before:top-2 before:bottom-2 before:w-1 before:bg-blue-500 before:rounded-full' 
-                      : 'text-[#a1a1aa] hover:text-white border-transparent hover:bg-white/[0.01]'
-                  }`}
-                >
-                  <i className="fas fa-shield-alt w-4 text-indigo-400/85"></i> Audit Logs
                 </button>
                 <button 
                   onClick={() => { triggerHaptic('light'); setActiveTab('password_reqs'); setIsMobileMenuOpen(false); }} 
@@ -685,7 +656,7 @@ export default function AdminPage() {
       </aside>
 
       {/* Main Area */}
-      <main className="flex-1 overflow-y-auto p-6 md:p-10 relative z-10">
+      <main className="flex-1 overflow-y-auto p-6 pb-24 md:p-10 md:pb-10 relative z-10">
         <div className="max-w-6xl mx-auto">
           {/* USER TAB */}
           {activeTab === 'users' && userRole === 'admin' && (
@@ -1233,73 +1204,6 @@ export default function AdminPage() {
           {/* ANALYTICS TAB */}
           {activeTab === 'analytics' && <AnalyticsDashboard />}
 
-          {/* AUDIT LOGS TAB */}
-          {userRole === 'admin' && activeTab === 'audit' && (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-                <div>
-                  <h2 className="text-3xl font-syne font-extrabold text-white tracking-tight">Security Audit Logs</h2>
-                  <p className="text-white/40 text-sm mt-1">Immutable record of admin actions taken on the system.</p>
-                </div>
-                <div className="flex gap-2 self-start sm:self-center">
-                  <button onClick={() => { triggerHaptic('light'); setAuditLogs([]); }} className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/30 text-red-400 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer">
-                    <i className="fas fa-trash-alt"></i> Clear Logs
-                  </button>
-                  <button onClick={() => { triggerHaptic('light'); fetchAuditLogsData(); }} className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-xl text-xs font-bold text-white transition-all flex items-center gap-2 cursor-pointer">
-                    <i className="fas fa-sync-alt"></i> Refresh Logs
-                  </button>
-                </div>
-              </div>
-
-              <div className="bg-[#18181b]/30 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden shadow-xl">
-                {loadingAudit ? (
-                  <div className="p-4 space-y-4 animate-pulse">
-                    {[...Array(5)].map((_, i) => (
-                      <div key={i} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
-                        <div className="h-4 bg-white/10 rounded w-1/4"></div>
-                        <div className="h-4 bg-white/10 rounded w-1/5"></div>
-                        <div className="h-6 bg-white/5 border border-white/10 rounded-md w-24"></div>
-                        <div className="h-8 bg-white/5 rounded-lg w-1/3"></div>
-                      </div>
-                    ))}
-                  </div>
-                ) : auditLogs.length === 0 ? (
-                  <p className="text-white/40 text-center py-8">No audit logs found.</p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse min-w-[600px]">
-                      <thead>
-                        <tr className="border-b border-white/10 bg-white/[0.02]">
-                          <th className="text-[#a1a1aa] font-bold text-xs uppercase tracking-wider p-4">Timestamp</th>
-                          <th className="text-[#a1a1aa] font-bold text-xs uppercase tracking-wider p-4">Admin Email</th>
-                          <th className="text-[#a1a1aa] font-bold text-xs uppercase tracking-wider p-4">Action</th>
-                          <th className="text-[#a1a1aa] font-bold text-xs uppercase tracking-wider p-4">Metadata</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {auditLogs.map((log) => (
-                          <tr key={log.id} className="border-b border-white/5 hover:bg-white/[0.01] transition-colors">
-                            <td className="p-4 text-[11px] text-white/50 whitespace-nowrap">{new Date(log.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</td>
-                            <td className="p-4 text-xs font-bold text-blue-400">{log.admin_email}</td>
-                            <td className="p-4">
-                              <span className="px-2 py-0.5 bg-white/5 text-white/80 text-[9px] font-black tracking-widest rounded-md border border-white/10">
-                                {log.action_type}
-                              </span>
-                            </td>
-                            <td className="p-4">
-                              <pre className="text-[9px] text-white/40 font-mono bg-black/40 p-2 rounded-lg max-w-xs overflow-x-auto leading-relaxed">
-                                {JSON.stringify(log.details, null, 2)}
-                              </pre>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
 
           {/* PASSWORD REQUESTS TAB */}
           {activeTab === 'password_reqs' && userRole === 'admin' && <PasswordRequestsTab />}

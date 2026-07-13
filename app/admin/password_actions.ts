@@ -2,7 +2,6 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { decrypt } from '@/utils/security'
-import { logAudit } from './audit_actions'
 
 export async function acceptPasswordRequest(requestId: string, email: string, newPassword: string) {
   const supabase = await createClient()
@@ -53,9 +52,6 @@ export async function acceptPasswordRequest(requestId: string, email: string, ne
     return { error: 'Password was changed, but failed to update request status.' }
   }
 
-  // Audit log this sensitive action
-  await logAudit('ACCEPT_PASSWORD_RESET', { request_id: requestId, email })
-
   return { success: true }
 }
 
@@ -81,9 +77,6 @@ export async function rejectPasswordRequest(requestId: string) {
     .eq('id', requestId)
 
   if (error) return { error: error.message }
-
-  // Audit log rejection
-  await logAudit('REJECT_PASSWORD_RESET', { request_id: requestId })
 
   return { success: true }
 }

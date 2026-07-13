@@ -7,6 +7,7 @@ const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
   : [
       'https://mscsrmap.edu.in',
+      'https://msc-srmap.web.app',
       'http://localhost:3000',
       'http://127.0.0.1:3000',
       process.env.NEXT_PUBLIC_APP_URL || ''
@@ -38,20 +39,11 @@ export async function middleware(request: NextRequest) {
     });
   }
 
-  // Initialize base response
   let supabaseResponse = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
+    request,
   });
 
-  // Inject CORS headers into the response if request has Origin
-  if (origin && isAllowedOrigin) {
-    supabaseResponse.headers.set('Access-Control-Allow-Origin', origin);
-    supabaseResponse.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    supabaseResponse.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Next-Action, Next-Router-State-Tree, Next-Router-Prefetch');
-    supabaseResponse.headers.set('Access-Control-Allow-Credentials', 'true');
-  }
+
 
   // 2. Initialize Supabase Client to refresh sessions and perform RBAC checks
   const supabase = createServerClient(
@@ -77,6 +69,14 @@ export async function middleware(request: NextRequest) {
 
   // Retrieve user session
   const { data: { session } } = await supabase.auth.getSession();
+
+  // Inject CORS headers into the response if request has Origin
+  if (origin && isAllowedOrigin) {
+    supabaseResponse.headers.set('Access-Control-Allow-Origin', origin);
+    supabaseResponse.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    supabaseResponse.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Next-Action, Next-Router-State-Tree, Next-Router-Prefetch');
+    supabaseResponse.headers.set('Access-Control-Allow-Credentials', 'true');
+  }
 
   // 3. Rate Limiting implementation (Vulnerability 1)
   const clientIp = getClientIp(request);
@@ -121,13 +121,6 @@ export async function middleware(request: NextRequest) {
     });
   }
 
-  // 4. Hard Localhost Guard for Admin Dashboard
-  if (currentPath.startsWith('/admin')) {
-    const hostname = request.headers.get('host') || '';
-    if (!hostname.includes('localhost') && !hostname.includes('127.0.0.1')) {
-      return new NextResponse('403 FORBIDDEN - Admin Dashboard is strictly inaccessible from public networks.', { status: 403 });
-    }
-  }
 
   // 5. Authentication & Authorization Guards (Vulnerability 2)
   const isProtected = currentPath.startsWith('/admin') || 

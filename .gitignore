@@ -36,7 +36,3 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-
-Resume: agy --conversation=7b360272-f9eb-4296-b664-a4bd24786316 (or -c)
-Resume in the same project: agy --conversation=7b360272-f9eb-4296-b664-a4bd24786316 --project=default-cli-project
-ypragnesh@Y-N-Pragnesh mscsrmap % 

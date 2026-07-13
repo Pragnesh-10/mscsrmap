@@ -10,10 +10,12 @@ export default function LoginPage() {
   const [showResetForm, setShowResetForm] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
 
-  async function handleLoginSubmit(formData: FormData) {
+  async function handleLoginSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
     setLoading(true)
     setError(null)
     setSuccess(null)
+    const formData = new FormData(e.currentTarget)
     const result = await login(formData)
     if (result?.error) {
       setError(result.error)
@@ -21,10 +23,13 @@ export default function LoginPage() {
     }
   }
 
-  async function handleResetSubmit(formData: FormData) {
+  async function handleResetSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
     setLoading(true)
     setError(null)
     setSuccess(null)
+    
+    const formData = new FormData(e.currentTarget)
     
     const newPassword = formData.get('new_password') as string
     const confirmPassword = formData.get('confirm_password') as string
@@ -58,7 +63,7 @@ export default function LoginPage() {
         </p>
 
         {showResetForm ? (
-          <form action={handleResetSubmit} className="text-left space-y-5">
+          <form onSubmit={handleResetSubmit} className="text-left space-y-5">
             <div>
               <label className="block text-sm text-[#aaaaaa] mb-2" htmlFor="reset-email">Email Address</label>
               <input type="email" id="reset-email" name="email" required placeholder="student@srmap.edu.in" className="w-full p-3 bg-black/50 border border-[#333333] rounded-md text-white focus:outline-none focus:border-[#0078d4] transition-colors" />
@@ -95,7 +100,7 @@ export default function LoginPage() {
             </div>
           </form>
         ) : (
-          <form action={handleLoginSubmit} className="text-left space-y-5">
+          <form onSubmit={handleLoginSubmit} className="text-left space-y-5">
             <div>
               <label className="block text-sm text-[#aaaaaa] mb-2" htmlFor="email">Email Address</label>
               <input type="email" id="email" name="email" required placeholder="student@srmap.edu.in" className="w-full p-3 bg-black/50 border border-[#333333] rounded-md text-white focus:outline-none focus:border-[#0078d4] transition-colors" />

@@ -2,7 +2,6 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
-import { logAudit } from '../../audit_actions'
 import { sendRegistrationEmail } from '@/utils/resend'
 
 export async function assignCertificates(eventId: string, registrationIds: string[], type: string) {
@@ -22,8 +21,15 @@ export async function assignCertificates(eventId: string, registrationIds: strin
     return { error: 'Unauthorized' }
   }
 
+  // Create Admin Supabase Client for bypassing RLS
+  const { createClient: createSupabaseClient } = require('@supabase/supabase-js');
+  const supabaseAdmin = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
   // Fetch all target registrations to update their form_data
-  const { data: regs, error: fetchError } = await supabase
+  const { data: regs, error: fetchError } = await supabaseAdmin
     .from('registrations')
     .select('id, form_data')
     .in('id', registrationIds)
@@ -37,7 +43,7 @@ export async function assignCertificates(eventId: string, registrationIds: strin
       certificate_type: type
     }
 
-    const { error: updateError } = await supabase
+    const { error: updateError } = await supabaseAdmin
       .from('registrations')
       .update({ form_data: updatedFormData })
       .eq('id', reg.id)
@@ -48,7 +54,6 @@ export async function assignCertificates(eventId: string, registrationIds: strin
   }
 
   revalidatePath(`/admin/events/${eventId}`)
-  await logAudit('ASSIGN_CERTIFICATES', { event_id: eventId, count: regs.length, type })
   return { success: true }
 }
 
@@ -69,7 +74,14 @@ export async function updateRegistrationDetails(eventId: string, regId: string, 
     return { error: 'Unauthorized' }
   }
 
-  const { error } = await supabase
+  // Create Admin Supabase Client for bypassing RLS
+  const { createClient: createSupabaseClient } = require('@supabase/supabase-js');
+  const supabaseAdmin = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  const { error } = await supabaseAdmin
     .from('registrations')
     .update({
       lead_email: leadEmail,
@@ -81,7 +93,6 @@ export async function updateRegistrationDetails(eventId: string, regId: string, 
   if (error) return { error: error.message }
 
   revalidatePath(`/admin/events/${eventId}`)
-  await logAudit('UPDATE_REGISTRATION', { event_id: eventId, registration_id: regId })
   return { success: true }
 }
 
@@ -102,18 +113,25 @@ export async function deleteRegistration(eventId: string, regId: string) {
     return { error: 'Unauthorized' }
   }
 
+  // Create Admin Supabase Client for bypassing RLS
+  const { createClient: createSupabaseClient } = require('@supabase/supabase-js');
+  const supabaseAdmin = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
   // Get hash_payload to delete from teams if applicable
-  const { data: regData } = await supabase
+  const { data: regData } = await supabaseAdmin
     .from('registrations')
     .select('hash_payload')
     .eq('id', regId)
     .single()
 
   if (regData?.hash_payload) {
-    await supabase.from('teams').delete().eq('hash_payload', regData.hash_payload)
+    await supabaseAdmin.from('teams').delete().eq('hash_payload', regData.hash_payload)
   }
 
-  const { error } = await supabase
+  const { error } = await supabaseAdmin
     .from('registrations')
     .delete()
     .eq('id', regId)
@@ -121,7 +139,6 @@ export async function deleteRegistration(eventId: string, regId: string) {
   if (error) return { error: error.message }
 
   revalidatePath(`/admin/events/${eventId}`)
-  await logAudit('DELETE_REGISTRATION', { event_id: eventId, registration_id: regId })
   return { success: true }
 }
 
@@ -279,7 +296,6 @@ export async function importExternalRegistrations(eventId: string, rows: any[]) 
     }
   }
 
-  await logAudit('IMPORT_CSV_REGISTRATIONS', { event_id: eventId, success_count: successCount, skip_count: skipCount });
   revalidatePath(`/admin/events/${eventId}`);
   
   return { success: true, successCount, skipCount, errors };
@@ -311,7 +327,6 @@ export async function updateEventDetails(eventId: string, updateData: any) {
 
   revalidatePath('/admin', 'layout')
   revalidatePath('/events', 'layout')
-  await logAudit('UPDATE_EVENT', { event_id: eventId, title: updateData.title })
   return { success: true }
 }
 
@@ -336,13 +351,20 @@ export async function syncOfflineCheckins(eventId: string, checkins: Array<{
     return { error: 'Unauthorized' }
   }
 
+  // Create Admin Supabase Client for bypassing RLS
+  const { createClient: createSupabaseClient } = require('@supabase/supabase-js');
+  const supabaseAdmin = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
   let successCount = 0;
   const errors: string[] = [];
 
   for (const checkin of checkins) {
     try {
       if (checkin.type === 'PRIMARY') {
-        const { error } = await supabase
+        const { error } = await supabaseAdmin
           .from('registrations')
           .update({ checked_in: true })
           .eq('hash_payload', checkin.hash)
@@ -352,11 +374,10 @@ export async function syncOfflineCheckins(eventId: string, checkins: Array<{
           errors.push(`Failed to check in primary ${checkin.hash}: ${error.message}`);
         } else {
           successCount++;
-          await logAudit('SCAN_TICKET', { hash: checkin.hash, event_id: eventId });
         }
       } else if (checkin.type === 'MEMBER' && typeof checkin.memberIndex === 'number') {
         // Fetch latest team_data
-        const { data: reg, error: fetchError } = await supabase
+        const { data: reg, error: fetchError } = await supabaseAdmin
           .from('registrations')
           .select('team_data')
           .eq('hash_payload', checkin.hash)
@@ -372,7 +393,7 @@ export async function syncOfflineCheckins(eventId: string, checkins: Array<{
         if (teamData && teamData.members && teamData.members[checkin.memberIndex]) {
           teamData.members[checkin.memberIndex].checked_in = true;
           
-          const { error: updateError } = await supabase
+          const { error: updateError } = await supabaseAdmin
             .from('registrations')
             .update({ team_data: teamData })
             .eq('hash_payload', checkin.hash)
@@ -382,7 +403,6 @@ export async function syncOfflineCheckins(eventId: string, checkins: Array<{
             errors.push(`Failed to check in member index ${checkin.memberIndex} of ${checkin.hash}: ${updateError.message}`);
           } else {
             successCount++;
-            await logAudit('SCAN_TICKET_MEMBER', { hash: checkin.hash, member_index: checkin.memberIndex, event_id: eventId });
           }
         } else {
           errors.push(`Invalid member index ${checkin.memberIndex} for ${checkin.hash}`);

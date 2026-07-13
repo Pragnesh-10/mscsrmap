@@ -24,7 +24,7 @@ export default function AboutTab() {
           <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 hover:border-blue-500/30 hover:bg-white/[0.04] transition-all duration-300">
             <h4 className="text-blue-400 font-syne font-semibold mb-2 flex items-center gap-2"><i className="fas fa-shield-alt"></i> Security & Roles</h4>
             <p className="text-xs text-white/55 leading-relaxed">
-              Strict Role-Based Access Control (RBAC) ensures Core Members can manage events and team members, while Admins have exclusive access to User Roles and system-wide Audit Logs.
+              Strict Role-Based Access Control (RBAC) ensures Core Members can manage events and team members, while Admins have exclusive access to User Roles.
             </p>
           </div>
           <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 hover:border-green-500/30 hover:bg-white/[0.04] transition-all duration-300">

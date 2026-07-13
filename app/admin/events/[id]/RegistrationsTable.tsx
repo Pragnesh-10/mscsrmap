@@ -54,7 +54,10 @@ export default function RegistrationsTable({ registrations, eventTitle, eventId 
 
   const saveEditing = async (regId: string) => {
     setIsSaving(true)
-    await updateRegistrationDetails(eventId, regId, editForm.lead_email, editForm.form_data, editForm.team_data)
+    const res = await updateRegistrationDetails(eventId, regId, editForm.lead_email, editForm.form_data, editForm.team_data)
+    if (res?.error) {
+      alert(`Error updating details: ${res.error}`)
+    }
     setIsSaving(false)
     setEditingId(null)
   }
@@ -311,8 +314,8 @@ export default function RegistrationsTable({ registrations, eventTitle, eventId 
                                     <input type="text" placeholder="Full Name" value={editForm.form_data?.fullName || ''} onChange={(e) => setEditForm({...editForm, form_data: {...editForm.form_data, fullName: e.target.value}})} className="w-full bg-black/40 border border-white/10 rounded-md p-2 text-white text-sm focus:border-blue-500 outline-none" />
                                     <input type="text" placeholder="Email" value={editForm.lead_email || ''} onChange={(e) => setEditForm({...editForm, lead_email: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-md p-2 text-white text-sm focus:border-blue-500 outline-none" />
                                     <div className="flex gap-2">
-                                      {reg.form_data?.regNum !== undefined && <input type="text" placeholder="Reg Num" value={editForm.form_data?.regNum || ''} onChange={(e) => setEditForm({...editForm, form_data: {...editForm.form_data, regNum: e.target.value}})} className="w-1/2 bg-black/40 border border-white/10 rounded-md p-2 text-white text-xs focus:border-blue-500 outline-none" />}
-                                      {reg.form_data?.branch !== undefined && <input type="text" placeholder="Branch" value={editForm.form_data?.branch || ''} onChange={(e) => setEditForm({...editForm, form_data: {...editForm.form_data, branch: e.target.value}})} className="w-1/2 bg-black/40 border border-white/10 rounded-md p-2 text-white text-xs focus:border-blue-500 outline-none" />}
+                                      <input type="text" placeholder="Reg Num" value={editForm.form_data?.regNum || ''} onChange={(e) => setEditForm({...editForm, form_data: {...editForm.form_data, regNum: e.target.value}})} className="w-1/2 bg-black/40 border border-white/10 rounded-md p-2 text-white text-xs focus:border-blue-500 outline-none" />
+                                      <input type="text" placeholder="Branch" value={editForm.form_data?.branch || ''} onChange={(e) => setEditForm({...editForm, form_data: {...editForm.form_data, branch: e.target.value}})} className="w-1/2 bg-black/40 border border-white/10 rounded-md p-2 text-white text-xs focus:border-blue-500 outline-none" />
                                     </div>
                                   </>
                                 ) : (
@@ -346,16 +349,16 @@ export default function RegistrationsTable({ registrations, eventTitle, eventId 
                                         setEditForm({...editForm, team_data: {...editForm.team_data, members: newMembers}});
                                       }} className="w-full bg-black/40 border border-white/10 rounded-md p-2 text-white text-sm focus:border-blue-500 outline-none" />
                                       <div className="flex gap-2">
-                                        {member.regNum !== undefined && <input type="text" placeholder="Reg Num" value={member.regNum || ''} onChange={(e) => {
+                                        <input type="text" placeholder="Reg Num" value={member.regNum || ''} onChange={(e) => {
                                           const newMembers = [...editForm.team_data.members];
                                           newMembers[idx] = { ...newMembers[idx], regNum: e.target.value };
                                           setEditForm({...editForm, team_data: {...editForm.team_data, members: newMembers}});
-                                        }} className="w-1/2 bg-black/40 border border-white/10 rounded-md p-2 text-white text-xs focus:border-blue-500 outline-none" />}
-                                        {member.branch !== undefined && <input type="text" placeholder="Branch" value={member.branch || ''} onChange={(e) => {
+                                        }} className="w-1/2 bg-black/40 border border-white/10 rounded-md p-2 text-white text-xs focus:border-blue-500 outline-none" />
+                                        <input type="text" placeholder="Branch" value={member.branch || ''} onChange={(e) => {
                                           const newMembers = [...editForm.team_data.members];
                                           newMembers[idx] = { ...newMembers[idx], branch: e.target.value };
                                           setEditForm({...editForm, team_data: {...editForm.team_data, members: newMembers}});
-                                        }} className="w-1/2 bg-black/40 border border-white/10 rounded-md p-2 text-white text-xs focus:border-blue-500 outline-none" />}
+                                        }} className="w-1/2 bg-black/40 border border-white/10 rounded-md p-2 text-white text-xs focus:border-blue-500 outline-none" />
                                       </div>
                                     </>
                                   ) : (
