@@ -26,6 +26,17 @@ export default function AnalyticsDashboard() {
 
   useEffect(() => {
     fetchAnalytics()
+
+    const channel = supabase.channel('analytics_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'registrations' }, () => {
+        // Re-fetch stats when registrations change (e.g. check-ins, new signups)
+        fetchAnalytics()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
 
   async function fetchAnalytics() {

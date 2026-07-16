@@ -125,6 +125,21 @@ export default async function EventPage(props: {
                     <span>{evt.location}</span>
                   </div>
                 )}
+                {evt.form_requirements?.event_pricing === 'paid' && (
+                  <div className="flex items-center gap-2">
+                    <i className="fas fa-rupee-sign text-amber-400"></i>
+                    <span className="text-amber-400 font-bold">
+                      ₹{evt.form_requirements.registration_fee}
+                      {evt.form_requirements.charge_type === 'per_team' ? ' per team' : ' per person'}
+                    </span>
+                  </div>
+                )}
+                {evt.form_requirements?.event_pricing === 'free' && (
+                  <div className="flex items-center gap-2">
+                    <i className="fas fa-gift text-green-400"></i>
+                    <span className="text-green-400 font-bold">Free Event</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>

@@ -54,6 +54,14 @@ export async function submitPublicRegistration(eventId: string, formData: any) {
   }
 
   const reqs = eventData.form_requirements || {}
+
+  // Validate payment for paid events
+  if (reqs.event_pricing === 'paid') {
+    if (!formData.payment_data?.razorpay_payment_id) {
+      return { error: 'Payment is required for this event. Please complete the payment first.' }
+    }
+  }
+
   if (!reqs.allow_external_students) {
     for (const email of allIncomingEmails) {
       if (email && !email.toLowerCase().endsWith('@srmap.edu.in')) {
@@ -101,7 +109,7 @@ export async function submitPublicRegistration(eventId: string, formData: any) {
   }
 
   // 3. Capacity Check
-  let incomingCount = 1 + teamMembers.length
+  const incomingCount = 1 + teamMembers.length
   let currentConfirmedCount = 0
   
   if (eventData.max_capacity) {
@@ -125,6 +133,7 @@ export async function submitPublicRegistration(eventId: string, formData: any) {
   delete baseFormData.teamMembers
   delete baseFormData.teamLeadIndex
   delete baseFormData.teamName
+  // payment_data stays in baseFormData for record-keeping
 
   // 6. Insert into Supabase registrations table
   const { data: insertedData, error } = await supabase

@@ -5,6 +5,23 @@ import { createPortal } from 'react-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import { TicketTemplate } from './TicketTemplate'
 import { submitPublicRegistration, lookupTeamRegistration, joinMatchmakingTeam } from '../events/actions'
+import { createClient } from '@/utils/supabase/client'
+
+function openRazorpayCheckout(options: any): Promise<any> {
+  return new Promise((resolve) => {
+    const script = document.createElement('script')
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js'
+    script.onload = () => {
+      const rzp = new (window as any).Razorpay({
+        ...options,
+        handler: (response: any) => resolve(response),
+        modal: { ondismiss: () => resolve(null) },
+      })
+      rzp.open()
+    }
+    document.body.appendChild(script)
+  })
+}
 
 function CertificatePreview({ member, reqs, event, currentReg }: any) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -127,6 +144,39 @@ export default function EventPortalTabs({ event, isWaitlistMode = false, openTea
     }
   }, [invitedTeam])
 
+  const [liveTeams, setLiveTeams] = useState<any[]>(openTeams)
+  const supabase = createClient()
+
+  useEffect(() => {
+    setLiveTeams(openTeams)
+
+    if (activeTab === 'matchmaking' && event.id) {
+      const channel = supabase.channel(`matchmaking_${event.id}`)
+        .on('postgres_changes', { 
+          event: '*', 
+          schema: 'public', 
+          table: 'teams',
+          filter: `event_id=eq.${event.id}` 
+        }, async (payload) => {
+          // Because teams are joined differently and we might miss joins if we just listen to 'teams', 
+          // a safer fallback is just refetching when 'teams' changes.
+          // But actually, 'teams' gets updated when members join (member_count changes? No, registration logic is complex).
+          // For now, let's refetch open teams when there's an update to 'teams'.
+          const { data } = await supabase
+            .from('teams')
+            .select('*')
+            .eq('event_id', event.id)
+            .eq('looking_for_members', true)
+          if (data) setLiveTeams(data)
+        })
+        .subscribe()
+
+      return () => {
+        supabase.removeChannel(channel)
+      }
+    }
+  }, [activeTab, event.id, openTeams])
+
   async function handleRegistrationSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setLoading(true)
@@ -202,6 +252,70 @@ export default function EventPortalTabs({ event, isWaitlistMode = false, openTea
       baseData.teamName = formData.get('teamName')
       baseData.lookingForMembers = formData.get('lookingForMembers') === 'on'
       baseData.maxTeamSize = teamSize
+    }
+
+    const isPaid = event.form_requirements?.event_pricing === 'paid'
+
+    if (isPaid) {
+      const fee = event.form_requirements.registration_fee
+      const chargeType = event.form_requirements.charge_type
+      
+      let amountInPaise: number
+      if (chargeType === 'per_team') {
+        amountInPaise = fee * 100
+      } else {
+        const totalMembers = 1 + teamMembers.length
+        amountInPaise = fee * totalMembers * 100
+      }
+
+      // 1. Create order
+      const orderRes = await fetch('/api/razorpay/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: amountInPaise,
+          receipt: `evt_${event.id}_${Date.now()}`,
+          notes: { event_id: event.id, email: baseData.email },
+        }),
+      })
+      const orderData = await orderRes.json()
+      if (orderData.error) { setErrorMsg(orderData.error); setLoading(false); return }
+
+      // 2. Open Razorpay Checkout
+      const paymentResult = await openRazorpayCheckout({
+        key: orderData.key_id,
+        amount: orderData.amount,
+        currency: orderData.currency,
+        order_id: orderData.order_id,
+        name: 'MSC SRMAP',
+        description: `Registration: ${event.title}`,
+        prefill: { email: baseData.email, name: baseData.fullName },
+      })
+
+      if (!paymentResult) { setErrorMsg('Payment was cancelled.'); setLoading(false); return }
+
+      // 3. Verify payment
+      const verifyRes = await fetch('/api/razorpay/verify-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...paymentResult,
+          event_id: event.id,
+          payer_email: baseData.email,
+          amount: amountInPaise,
+          charge_type: chargeType,
+        }),
+      })
+      const verifyData = await verifyRes.json()
+      if (!verifyData.verified) { setErrorMsg('Payment verification failed.'); setLoading(false); return }
+
+      // Attach payment data to registration
+      baseData.payment_data = {
+        razorpay_payment_id: paymentResult.razorpay_payment_id,
+        razorpay_order_id: paymentResult.razorpay_order_id,
+        amount_paid: amountInPaise / 100,
+        charge_type: chargeType,
+      }
     }
 
     const res = await submitPublicRegistration(event.id, baseData)
@@ -682,7 +796,7 @@ export default function EventPortalTabs({ event, isWaitlistMode = false, openTea
                 <p className="text-white/40 text-sm">Looking for a team? Browse teams that are actively seeking members and join one instantly!</p>
               </div>
 
-              {openTeams.length === 0 ? (
+              {liveTeams.length === 0 ? (
                 <div className="text-center p-12 bg-white/5 rounded-2xl border border-white/10">
                   <div className="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-4 text-white/40">
                     <i className="fas fa-users-slash text-2xl"></i>
@@ -692,7 +806,7 @@ export default function EventPortalTabs({ event, isWaitlistMode = false, openTea
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {openTeams.map(team => (
+                  {liveTeams.map(team => (
                     <div key={team.id} className="bg-[#1e1e24] border border-cyan-500/20 rounded-2xl p-6 relative group overflow-hidden hover:border-cyan-500/40 transition-colors">
                       <div className="absolute top-0 left-0 w-1 h-full bg-cyan-500"></div>
                       <h3 className="text-xl font-bold text-white mb-1">{team.team_name}</h3>

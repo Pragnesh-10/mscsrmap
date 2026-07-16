@@ -69,6 +69,8 @@ export default function AdminPage() {
   const [editingTeamMember, setEditingTeamMember] = useState<any>(null)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [allowTeamsToggle, setAllowTeamsToggle] = useState(false)
+  const [eventPricingType, setEventPricingType] = useState<'free' | 'paid'>('free')
+  const [chargeType, setChargeType] = useState<'per_person' | 'per_team'>('per_person')
   
   const [statusMsg, setStatusMsg] = useState<{ id: string, msg: string, type: 'error' | 'success' | 'info' } | null>(null)
 
@@ -325,7 +327,10 @@ export default function AdminPage() {
       allow_external_students: formData.get('allow_external_students') === 'on',
       max_team_size: formData.get('allow_teams') === 'on' ? parseInt(formData.get('max_team_size') as string) || 1 : 1,
       provide_certificates: formData.get('provide_certificates') === 'on',
-      certificate_html: certificateHtml || null
+      certificate_html: certificateHtml || null,
+      event_pricing: eventPricingType,
+      charge_type: eventPricingType === 'paid' ? chargeType : null,
+      registration_fee: eventPricingType === 'paid' ? parseInt(formData.get('registration_fee') as string) || 0 : 0,
     }
 
     showStatus('create_event', 'Uploading and saving...', 'info')
@@ -870,7 +875,7 @@ export default function AdminPage() {
                           </label>
                           <div className="h-px bg-white/5 my-1"></div>
                           <label className="flex items-center gap-3 cursor-pointer select-none">
-                            <input type="checkbox" name="allow_teams" checked={allowTeamsToggle} onChange={(e) => setAllowTeamsToggle(e.target.checked)} className="w-4.5 h-4.5 accent-blue-500 rounded border-white/20 bg-black/50 cursor-pointer" />
+                            <input type="checkbox" name="allow_teams" checked={allowTeamsToggle} onChange={(e) => { setAllowTeamsToggle(e.target.checked); if (!e.target.checked) setChargeType('per_person'); }} className="w-4.5 h-4.5 accent-blue-500 rounded border-white/20 bg-black/50 cursor-pointer" />
                             <span className="text-sm font-semibold text-purple-400">Allow Team Registrations</span>
                           </label>
                           {allowTeamsToggle && (
@@ -881,6 +886,77 @@ export default function AdminPage() {
                           )}
                         </div>
                       </div>
+                    </div>
+
+                    {/* Registration Fee Section */}
+                    <div className="p-5 bg-black/30 border border-white/5 rounded-2xl mt-4">
+                      <h4 className="text-xs font-bold text-white mb-4 uppercase tracking-wider flex items-center gap-2">
+                        <i className="fas fa-rupee-sign text-green-400"></i> Registration Fee
+                      </h4>
+                      <div className="flex gap-3 mb-4">
+                        <button type="button"
+                          onClick={() => setEventPricingType('free')}
+                          className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all border ${
+                            eventPricingType === 'free'
+                              ? 'bg-green-500/15 text-green-400 border-green-500/30 shadow-[0_0_15px_rgba(34,197,94,0.1)]'
+                              : 'bg-white/5 text-white/50 border-white/10 hover:bg-white/10'
+                          }`}>
+                          <i className="fas fa-gift mr-2"></i>Free
+                        </button>
+                        <button type="button"
+                          onClick={() => setEventPricingType('paid')}
+                          className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all border ${
+                            eventPricingType === 'paid'
+                              ? 'bg-amber-500/15 text-amber-400 border-amber-500/30 shadow-[0_0_15px_rgba(245,158,11,0.1)]'
+                              : 'bg-white/5 text-white/50 border-white/10 hover:bg-white/10'
+                          }`}>
+                          <i className="fas fa-credit-card mr-2"></i>Paid
+                        </button>
+                      </div>
+
+                      {eventPricingType === 'paid' && (
+                        <div className="animate-in fade-in slide-in-from-top-2 duration-200 space-y-4">
+                          {/* Charge Type */}
+                          <div>
+                            <label className="text-[11px] font-bold text-[#a1a1aa] uppercase tracking-wider mb-2 block">
+                              Charge Type
+                            </label>
+                            <div className="flex gap-3">
+                              <label className="flex items-center gap-2 cursor-pointer text-sm text-white/80">
+                                <input type="radio" name="charge_type" value="per_person"
+                                  checked={chargeType === 'per_person'}
+                                  onChange={() => setChargeType('per_person')}
+                                  className="accent-blue-500" />
+                                Per Person
+                              </label>
+                              {allowTeamsToggle && (
+                                <label className="flex items-center gap-2 cursor-pointer text-sm text-white/80">
+                                  <input type="radio" name="charge_type" value="per_team"
+                                    checked={chargeType === 'per_team'}
+                                    onChange={() => setChargeType('per_team')}
+                                    className="accent-blue-500" />
+                                  Per Team
+                                </label>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Fee Amount */}
+                          <div className="flex flex-col gap-2">
+                            <label className="text-[11px] font-bold text-[#a1a1aa] uppercase tracking-wider">
+                              Registration Fee (₹)
+                            </label>
+                            <input type="number" name="registration_fee" min="1" step="1" required={eventPricingType === 'paid'}
+                              placeholder="e.g. 200"
+                              className="p-3 bg-black/40 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500" />
+                            <span className="text-[10px] text-white/40">
+                              {chargeType === 'per_person'
+                                ? 'Each participant pays this amount individually.'
+                                : 'This is charged once for the entire team.'}
+                            </span>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex justify-between items-center mt-2">
@@ -926,7 +1002,12 @@ export default function AdminPage() {
                             <i className="fas fa-calendar-alt text-4xl text-white/5"></i>
                           </div>
                         )}
-                        <div className="absolute top-4 right-4 flex gap-2">
+                        <div className="absolute top-4 right-4 flex gap-2 flex-wrap justify-end">
+                          {evt.form_requirements?.event_pricing === 'paid' && (
+                            <span className="px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border bg-amber-500/20 text-amber-400 border-amber-500/30">
+                              ₹{evt.form_requirements.registration_fee} {evt.form_requirements.charge_type === 'per_team' ? '/ Team' : '/ Person'}
+                            </span>
+                          )}
                           {evt.type && (
                             <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${evt.type === 'hackathon' ? 'bg-purple-500/20 text-purple-400 border-purple-500/30 shadow-[0_0_10px_rgba(168,85,247,0.1)]' : evt.type === 'workshop' ? 'bg-blue-500/20 text-blue-400 border-blue-500/30 shadow-[0_0_10px_rgba(59,130,246,0.1)]' : 'bg-zinc-800 text-zinc-400 border-zinc-700'}`}>
                               {evt.type}

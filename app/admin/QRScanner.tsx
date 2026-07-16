@@ -166,6 +166,27 @@ export default function QRScanner({ eventId }: { eventId?: string }) {
     }
   }, [])
 
+  // Real-time background sync for IndexedDB
+  useEffect(() => {
+    if (!selectedEventId || !isOnline) return;
+
+    const channel = supabase.channel(`scanner_${selectedEventId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'registrations', filter: `event_id=eq.${selectedEventId}` }, async (payload) => {
+        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+          // Save the new/updated record to IndexedDB so local search stays up-to-date
+          await saveSingleRegistration(payload.new)
+          // Update cached count
+          const count = await getRegistrationCount()
+          setCachedCount(count)
+        }
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [selectedEventId, isOnline])
+
   const checkTorchSupport = () => {
     try {
       const videoElem = document.getElementById('reader')?.getElementsByTagName('video')[0]

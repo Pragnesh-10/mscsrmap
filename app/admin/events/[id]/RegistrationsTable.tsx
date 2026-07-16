@@ -1,10 +1,13 @@
 'use client'
 
-import { useState, Fragment } from 'react'
+import { useState, useEffect, Fragment } from 'react'
+import { createClient } from '@/utils/supabase/client'
 import { assignCertificates, updateRegistrationDetails, deleteRegistration } from './actions'
 import IDCardModal from './IDCardModal'
 
 export default function RegistrationsTable({ registrations, eventTitle, eventId }: { registrations: any[], eventTitle: string, eventId: string }) {
+  const [liveRegs, setLiveRegs] = useState<any[]>(registrations)
+  const supabase = createClient()
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -16,6 +19,26 @@ export default function RegistrationsTable({ registrations, eventTitle, eventId 
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
   const [isIDModalOpen, setIsIDModalOpen] = useState(false)
+
+  useEffect(() => {
+    setLiveRegs(registrations)
+
+    const channel = supabase.channel(`regs_${eventId}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'registrations', filter: `event_id=eq.${eventId}` }, (payload) => {
+        setLiveRegs(prev => [payload.new, ...prev])
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'registrations', filter: `event_id=eq.${eventId}` }, (payload) => {
+        setLiveRegs(prev => prev.map(r => r.id === payload.new.id ? { ...r, ...payload.new } : r))
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'registrations', filter: `event_id=eq.${eventId}` }, (payload) => {
+        setLiveRegs(prev => prev.filter(r => r.id !== payload.old.id))
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [registrations, eventId])
 
   const toggleExpand = (id: string) => {
     setExpandedId(expandedId === id ? null : id)
@@ -76,7 +99,7 @@ export default function RegistrationsTable({ registrations, eventTitle, eventId 
     const rows = []
     rows.push(['Ticket ID', 'Email', 'Name', 'Reg Num', 'Branch', 'Team Name', 'Team Size', 'Status', 'Registration Date'])
     
-    registrations.forEach(reg => {
+    liveRegs.forEach(reg => {
       const teamName = reg.team_data?.teamName || 'N/A'
       const teamSize = reg.team_data?.members ? reg.team_data.members.length + 1 : 1
       const date = new Date(reg.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })
@@ -137,7 +160,7 @@ export default function RegistrationsTable({ registrations, eventTitle, eventId 
     document.body.removeChild(link)
   }
 
-  const filteredRegs = registrations.filter(reg => {
+  const filteredRegs = liveRegs.filter(reg => {
     const term = searchQuery.toLowerCase()
     return (
       reg.lead_email.toLowerCase().includes(term) ||
@@ -218,13 +241,14 @@ export default function RegistrationsTable({ registrations, eventTitle, eventId 
               <th className="bg-black/40 text-[#a1a1aa] font-semibold text-[12px] uppercase tracking-wider p-5 border-b border-white/10">Lead Email</th>
               <th className="bg-black/40 text-[#a1a1aa] font-semibold text-[12px] uppercase tracking-wider p-5 border-b border-white/10">Team Name</th>
               <th className="bg-black/40 text-[#a1a1aa] font-semibold text-[12px] uppercase tracking-wider p-5 border-b border-white/10 text-center">Certificate</th>
+              <th className="bg-black/40 text-[#a1a1aa] font-semibold text-[12px] uppercase tracking-wider p-5 border-b border-white/10 text-center">Payment</th>
               <th className="bg-black/40 text-[#a1a1aa] font-semibold text-[12px] uppercase tracking-wider p-5 border-b border-white/10 text-center">Status</th>
               <th className="bg-black/40 text-[#a1a1aa] font-semibold text-[12px] uppercase tracking-wider p-5 border-b border-white/10 text-right">Date</th>
             </tr>
           </thead>
           <tbody>
             {filteredRegs.length === 0 ? (
-              <tr><td colSpan={8} className="text-center p-10 text-white/40">No registrations found.</td></tr>
+              <tr><td colSpan={9} className="text-center p-10 text-white/40">No registrations found.</td></tr>
             ) : (
               filteredRegs.map(reg => {
                 const isTeam = reg.team_data && reg.team_data.members && reg.team_data.members.length > 0
@@ -263,6 +287,15 @@ export default function RegistrationsTable({ registrations, eventTitle, eventId 
                       </td>
                       <td className="p-5 text-center">{anyCheckedIn ? certBadge : <span className="text-white/20 text-xs">-</span>}</td>
                       <td className="p-5 text-center">
+                        {reg.form_data?.payment_data ? (
+                          <span className="text-amber-400 bg-amber-500/10 px-2 py-1 rounded-md text-xs font-bold border border-amber-500/20">
+                            ₹{reg.form_data.payment_data.amount_paid} <i className="fas fa-check ml-1"></i>
+                          </span>
+                        ) : (
+                          <span className="text-white/20 text-xs">-</span>
+                        )}
+                      </td>
+                      <td className="p-5 text-center">
                         {reg.checked_in ? (
                           <span className="text-green-400 bg-green-500/10 px-2 py-1 rounded-md text-xs font-bold border border-green-500/20"><i className="fas fa-check-circle mr-1"></i> Checked In</span>
                         ) : (
@@ -274,7 +307,7 @@ export default function RegistrationsTable({ registrations, eventTitle, eventId 
                     
                     {isExpanded && (
                       <tr className="bg-black/20 border-b border-blue-500/20">
-                        <td colSpan={8} className="p-0">
+                        <td colSpan={9} className="p-0">
                           <div className="p-6 md:p-8 animate-in slide-in-from-top-2 duration-200">
                             <div className="flex justify-between items-center mb-4">
                               <h4 className="text-xs font-bold text-blue-400 uppercase tracking-widest">{isTeam ? 'Detailed Roster' : 'Registration Details'}</h4>
