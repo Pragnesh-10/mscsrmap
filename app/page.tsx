@@ -1,4 +1,5 @@
 import Navbar from "./components/Navbar"
+import BackgroundVideo from "./components/BackgroundVideo"
 
 export default function Home() {
   return (
@@ -6,9 +7,10 @@ export default function Home() {
       <Navbar />
 
       {/* Background Video */}
-      <video className="fixed inset-0 w-full h-full object-cover -z-20 opacity-40 grayscale blur-sm brightness-50" muted loop playsInline autoPlay>
-        <source src="https://lkbwunzswqbnoygxtilm.supabase.co/storage/v1/object/public/webpage/Microsoft_Student_Community_Title_Card.mp4" type="video/mp4" />
-      </video>
+      <BackgroundVideo
+        src="https://lkbwunzswqbnoygxtilm.supabase.co/storage/v1/object/public/webpage/Microsoft_Student_Community_Title_Card.mp4"
+        className="fixed inset-0 w-full h-full object-cover -z-20 opacity-40 grayscale blur-sm brightness-50"
+      />
       <div className="fixed inset-0 bg-[#0a0a0b]/80 -z-10"></div>
 
       {/* Hero Section */}

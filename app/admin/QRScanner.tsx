@@ -168,10 +168,10 @@ export default function QRScanner({ eventId }: { eventId?: string }) {
 
   // Real-time background sync for IndexedDB
   useEffect(() => {
-    if (!selectedEventId || !isOnline) return;
+    if (!eventId || !isOnline) return;
 
-    const channel = supabase.channel(`scanner_${selectedEventId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'registrations', filter: `event_id=eq.${selectedEventId}` }, async (payload) => {
+    const channel = supabase.channel(`scanner_${eventId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'registrations', filter: `event_id=eq.${eventId}` }, async (payload) => {
         if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
           // Save the new/updated record to IndexedDB so local search stays up-to-date
           await saveSingleRegistration(payload.new)
@@ -185,7 +185,7 @@ export default function QRScanner({ eventId }: { eventId?: string }) {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [selectedEventId, isOnline])
+  }, [eventId, isOnline])
 
   const checkTorchSupport = () => {
     try {
@@ -213,7 +213,9 @@ export default function QRScanner({ eventId }: { eventId?: string }) {
     
     try {
       if (scannerRef.current.isScanning) {
-        await scannerRef.current.stop()
+        try {
+          await scannerRef.current.stop()
+        } catch (_) {}
       }
       setIsTorchOn(false)
       setTorchSupported(false)
@@ -227,7 +229,10 @@ export default function QRScanner({ eventId }: { eventId?: string }) {
       
       // Check if torch is supported after a brief delay for camera setup
       setTimeout(checkTorchSupport, 500)
-    } catch (err) {
+    } catch (err: any) {
+      if (err?.name === 'AbortError' || err?.toString()?.includes('interrupted')) {
+        return
+      }
       console.error("Error starting camera scanner:", err)
       setCameraError("Could not start scanner. Ensure you have granted camera permissions.")
     }
@@ -267,13 +272,19 @@ export default function QRScanner({ eventId }: { eventId?: string }) {
     })
 
     return () => {
-      if (html5QrCode.isScanning) {
-        html5QrCode.stop().then(() => {
-          html5QrCode.clear()
-        }).catch(console.error)
-      } else {
-        try { html5QrCode.clear() } catch(e) {}
-      }
+      try {
+        if (html5QrCode.isScanning) {
+          html5QrCode.stop().then(() => {
+            try { html5QrCode.clear() } catch (_) {}
+          }).catch(err => {
+            if (err?.name !== 'AbortError' && !err?.toString()?.includes('interrupted')) {
+              console.debug('Scanner cleanup:', err)
+            }
+          })
+        } else {
+          try { html5QrCode.clear() } catch (_) {}
+        }
+      } catch (_) {}
     }
   }, [isCameraActive])
 

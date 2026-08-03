@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/server';
 import Navbar from '../components/Navbar';
+import BackgroundVideo from '../components/BackgroundVideo';
 import './events.css';
 import Link from 'next/link';
 import EventsClientLogic from './EventsClientLogic';
@@ -23,12 +24,11 @@ export default async function EventsPage() {
     <div className="events-page text-[#ededed]">
       <canvas id="canvas-particles"></canvas>
 
-      <video className="background-video" muted loop playsInline id="bgVideo" preload="metadata" autoPlay>
-        <source
-          src="https://lkbwunzswqbnoygxtilm.supabase.co/storage/v1/object/public/webpage/Microsoft_Student_Community_Title_Card.mp4"
-          type="video/mp4"
-        />
-      </video>
+      <BackgroundVideo
+        id="bgVideo"
+        src="https://lkbwunzswqbnoygxtilm.supabase.co/storage/v1/object/public/webpage/Microsoft_Student_Community_Title_Card.mp4"
+        className="background-video"
+      />
 
       <Navbar />
 
